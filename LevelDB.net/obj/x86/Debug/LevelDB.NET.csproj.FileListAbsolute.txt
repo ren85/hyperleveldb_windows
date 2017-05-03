@@ -1,0 +1,5 @@
+C:\Users\renbo\Desktop\LevelDB-master\Debug\LevelDBTest.exe
+C:\Users\renbo\Desktop\LevelDB-master\Debug\LevelDBTest.pdb
+C:\Users\renbo\Desktop\LevelDB-master\LevelDB.net\obj\x86\Debug\LevelDB.NET.csprojResolveAssemblyReference.cache
+C:\Users\renbo\Desktop\LevelDB-master\LevelDB.net\obj\x86\Debug\LevelDBTest.exe
+C:\Users\renbo\Desktop\LevelDB-master\LevelDB.net\obj\x86\Debug\LevelDBTest.pdb
