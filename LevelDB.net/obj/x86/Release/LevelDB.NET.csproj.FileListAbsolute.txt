@@ -1,4 +1,0 @@
-C:\Users\renbo\Desktop\LevelDB-master\Release\LevelDBTest.exe
-C:\Users\renbo\Desktop\LevelDB-master\Release\LevelDBTest.pdb
-C:\Users\renbo\Desktop\LevelDB-master\LevelDB.net\obj\x86\Release\LevelDBTest.exe
-C:\Users\renbo\Desktop\LevelDB-master\LevelDB.net\obj\x86\Release\LevelDBTest.pdb

@@ -118,6 +118,7 @@
     <ClCompile Include="port\sha1_portable.cc" />
     <ClCompile Include="table\block.cc" />
     <ClCompile Include="table\block_builder.cc" />
+    <ClCompile Include="table\filter_block.cc" />
     <ClCompile Include="table\format.cc" />
     <ClCompile Include="table\iterator.cc" />
     <ClCompile Include="table\merger.cc" />
@@ -125,6 +126,7 @@
     <ClCompile Include="table\table_builder.cc" />
     <ClCompile Include="table\two_level_iterator.cc" />
     <ClCompile Include="util\arena.cc" />
+    <ClCompile Include="util\atomic.cc" />
     <ClCompile Include="util\cache.cc" />
     <ClCompile Include="util\coding.cc" />
     <ClCompile Include="util\coding_test.cc" />
@@ -151,6 +153,7 @@
     <ClInclude Include="db\log_reader.h" />
     <ClInclude Include="db\log_writer.h" />
     <ClInclude Include="db\memtable.h" />
+    <ClInclude Include="db\replay_iterator.h" />
     <ClInclude Include="db\skiplist.h" />
     <ClInclude Include="db\snapshot.h" />
     <ClInclude Include="db\table_cache.h" />
@@ -163,8 +166,10 @@
     <ClInclude Include="include\leveldb\db.h" />
     <ClInclude Include="include\leveldb\env.h" />
     <ClInclude Include="include\leveldb\extensions.h" />
+    <ClInclude Include="include\leveldb\filter_policy.h" />
     <ClInclude Include="include\leveldb\iterator.h" />
     <ClInclude Include="include\leveldb\options.h" />
+    <ClInclude Include="include\leveldb\replay_iterator.h" />
     <ClInclude Include="include\leveldb\slice.h" />
     <ClInclude Include="include\leveldb\status.h" />
     <ClInclude Include="include\leveldb\table.h" />
@@ -182,9 +187,11 @@
     <ClInclude Include="port\port_posix.h" />
     <ClInclude Include="port\port_win.h" />
     <ClInclude Include="port\sha1_portable.h" />
+    <ClInclude Include="port\thread_annotations.h" />
     <ClInclude Include="port\win\stdint.h" />
     <ClInclude Include="table\block.h" />
     <ClInclude Include="table\block_builder.h" />
+    <ClInclude Include="table\filter_block.h" />
     <ClInclude Include="table\format.h" />
     <ClInclude Include="table\iterator_wrapper.h" />
     <ClInclude Include="table\merger.h" />
@@ -196,6 +203,7 @@
     <ClInclude Include="test\Stdafx.h" />
     <ClInclude Include="test\Test.h" />
     <ClInclude Include="util\arena.h" />
+    <ClInclude Include="util\atomic.h" />
     <ClInclude Include="util\coding.h" />
     <ClInclude Include="util\crc32c.h" />
     <ClInclude Include="util\hash.h" />
@@ -204,6 +212,7 @@
     <ClInclude Include="util\mutexlock.h" />
     <ClInclude Include="util\posix_logger.h" />
     <ClInclude Include="util\random.h" />
+    <ClInclude Include="util\string_builder.h" />
     <ClInclude Include="util\testharness.h" />
     <ClInclude Include="util\testutil.h" />
     <ClInclude Include="util\win_logger.h" />
