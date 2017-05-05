@@ -20,8 +20,8 @@
 // usage.  It will be no more incorrect than LevelDB, and it will stay out of
 // our way with these pragmas
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Weffc++"
+//#pragma GCC diagnostic push
+//#pragma GCC diagnostic ignored "-Weffc++"
 
 using leveldb::Cache;
 using leveldb::Comparator;
@@ -591,9 +591,9 @@ extern "C" {
 		delete env;
 	}
 
-	void leveldb_free(void* ptr) {
-		free(ptr);
-	}
+	//void leveldb_free(void* ptr) {
+	//	free(ptr);
+	//}
 
 	int leveldb_major_version() {
 		return kMajorVersion;

@@ -275,7 +275,7 @@ extern "C" {
 	in this file.  Note that in certain cases (typically on Windows), you
 	may need to call this routine instead of free(ptr) to dispose of
 	malloc()-ed memory returned by this library. */
-	extern void leveldb_free(void* ptr);
+	//extern void leveldb_free(void* ptr);
 
 	/* Return the major version number for this release. */
 	extern int leveldb_major_version();

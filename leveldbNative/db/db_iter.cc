@@ -3,7 +3,7 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
 #define __STDC_LIMIT_MACROS
-typedef SSIZE_T ssize_t;
+//typedef SSIZE_T ssize_t;
 
 #include "db/db_iter.h"
 
@@ -114,7 +114,7 @@ namespace leveldb {
 			}
 
 			// Pick next gap with average value of config::kReadBytesPeriod.
-			ssize_t RandomPeriod() {
+			SSIZE_T RandomPeriod() {
 				return rnd_.Uniform(2 * config::kReadBytesPeriod);
 			}
 
@@ -130,8 +130,8 @@ namespace leveldb {
 			bool valid_;
 
 			Random rnd_;
-			ssize_t bytes_counter_;
-			ssize_t tombstones_counter_;
+			SSIZE_T bytes_counter_;
+			SSIZE_T tombstones_counter_;
 
 			// No copying allowed
 			DBIter(const DBIter&);
@@ -140,7 +140,7 @@ namespace leveldb {
 
 		inline bool DBIter::ParseKey(ParsedInternalKey* ikey) {
 			Slice k = iter_->key();
-			ssize_t n = k.size() + iter_->value().size();
+			SSIZE_T n = k.size() + iter_->value().size();
 			bytes_counter_ -= n;
 			while (bytes_counter_ < 0) {
 				bytes_counter_ += RandomPeriod();

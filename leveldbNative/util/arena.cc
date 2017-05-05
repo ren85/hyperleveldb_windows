@@ -154,7 +154,7 @@ namespace leveldb {
 		store_ptr_nobarrier(&nb->next_upper, nb->base + sz);
 		store_32_nobarrier(&nb->size, sz);
 		store_32_release(&nb->rem, sz);
-		//return nb;
+		return nb;
 	}
 
 	char* Arena::AllocateLarge(size_t bytes) {

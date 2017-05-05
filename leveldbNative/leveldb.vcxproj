@@ -108,6 +108,7 @@
     <ClCompile Include="db\log_writer.cc" />
     <ClCompile Include="db\memtable.cc" />
     <ClCompile Include="db\repair.cc" />
+    <ClCompile Include="db\replay_iterator.cc" />
     <ClCompile Include="db\table_cache.cc" />
     <ClCompile Include="db\version_edit.cc" />
     <ClCompile Include="db\version_set.cc" />
@@ -127,6 +128,7 @@
     <ClCompile Include="table\two_level_iterator.cc" />
     <ClCompile Include="util\arena.cc" />
     <ClCompile Include="util\atomic.cc" />
+    <ClCompile Include="util\bloom.cc" />
     <ClCompile Include="util\cache.cc" />
     <ClCompile Include="util\coding.cc" />
     <ClCompile Include="util\coding_test.cc" />
@@ -134,6 +136,7 @@
     <ClCompile Include="util\crc32c.cc" />
     <ClCompile Include="util\env.cc" />
     <ClCompile Include="util\env_boost.cc" />
+    <ClCompile Include="util\filter_policy.cc" />
     <ClCompile Include="util\hash.cc" />
     <ClCompile Include="util\histogram.cc" />
     <ClCompile Include="util\logging.cc" />

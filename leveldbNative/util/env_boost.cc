@@ -129,6 +129,343 @@ class PosixSequentialFile: public SequentialFile {
   }
 };
 
+// We preallocate up to an extra megabyte and use memcpy to append new
+// data to the file.  This is safe since we either properly close the
+// file before reading from it, or for log files, the reading code
+// knows enough to skip zero suffixes.
+class PosixMmapFile : public ConcurrentWritableFile {
+private:
+	PosixMmapFile(const PosixMmapFile&);
+	PosixMmapFile& operator = (const PosixMmapFile&);
+	struct MmapSegment {
+		char* base_;
+		HANDLE handle;
+	};
+
+	std::string filename_;    // Path to the file
+	int fd_;                  // The open file
+	const size_t block_size_; // System page size
+	uint64_t end_offset_;     // Where does the file end?
+	MmapSegment* segments_;   // mmap'ed regions of memory
+	size_t segments_sz_;      // number of segments that are truncated
+	bool trunc_in_progress_;  // is there an ongoing truncate operation?
+	uint64_t trunc_waiters_;  // number of threads waiting for truncate
+	port::Mutex mtx_;         // Protection for state
+	port::CondVar cnd_;       // Wait for truncate
+	HANDLE _base_handle;
+
+							  // Roundup x to a multiple of y
+	static size_t Roundup(size_t x, size_t y) {
+		return ((x + y - 1) / y) * y;
+	}
+
+	bool GrowViaTruncate(uint64_t block) {
+		mtx_.Lock();
+		while (trunc_in_progress_ && segments_sz_ <= block) {
+			++trunc_waiters_;
+			cnd_.Wait();
+			--trunc_waiters_;
+		}
+		uint64_t cur_sz = segments_sz_;
+		trunc_in_progress_ = cur_sz <= block;
+		mtx_.Unlock();
+
+		bool error = false;
+		if (cur_sz <= block) {
+			uint64_t new_sz = ((block + 7) & ~7ULL) + 1;
+			/*if (ftruncate(fd_, new_sz * block_size_) < 0) {
+				error = true;
+			}*/
+			if (_chsize(fd_, new_sz * block_size_) < 0) {
+				error = true;
+			}
+			MmapSegment* new_segs = new MmapSegment[new_sz];
+			MmapSegment* old_segs = NULL;
+			mtx_.Lock();
+			old_segs = segments_;
+			for (size_t i = 0; i < segments_sz_; ++i) {
+				new_segs[i].base_ = old_segs[i].base_;
+				new_segs[i].handle = old_segs[i].handle;
+			}
+			for (size_t i = segments_sz_; i < new_sz; ++i) {
+				new_segs[i].base_ = NULL;
+				new_segs[i].handle = NULL;
+			}
+			segments_ = new_segs;
+			segments_sz_ = new_sz;
+			trunc_in_progress_ = false;
+			cnd_.SignalAll();
+			mtx_.Unlock();
+			delete[] old_segs;
+		}
+		return !error;
+	}
+
+	bool UnmapSegment(char* base) {
+		int reval = UnmapViewOfFile(base);
+		CloseHandle(_base_handle);
+		return reval != 0;//munmap(base, block_size_) >= 0;
+	}
+
+	// Call holding mtx_
+	char* GetSegment(uint64_t block) {
+		char* base = NULL;
+		mtx_.Lock();
+		size_t cur_sz = segments_sz_;
+		if (block < segments_sz_) {
+			base = segments_[block].base_;
+		}
+		mtx_.Unlock();
+		if (base) {
+			return base;
+		}
+		if (cur_sz <= block) {
+			if (!GrowViaTruncate(block)) {
+				return NULL;
+			}
+		}
+		/*void* ptr = mmap(NULL, block_size_, PROT_READ | PROT_WRITE,
+			MAP_SHARED, fd_, block * block_size_);
+		if (ptr == MAP_FAILED) {
+			abort();
+			return NULL;
+		}*/
+
+		void* ptr = NULL;
+		DWORD off_hi = (DWORD)((block * block_size_) >> 32);
+		DWORD off_lo = (DWORD)((block * block_size_) & 0xFFFFFFFF);
+		_base_handle = CreateFileMappingA(
+			_base_handle,
+			NULL,
+			PAGE_READWRITE,
+			0,
+			0,
+			0);
+		if (_base_handle != NULL) {
+			ptr = (char*)MapViewOfFile(_base_handle,
+				FILE_MAP_ALL_ACCESS,
+				off_hi,
+				off_lo,
+				block_size_);
+			if (ptr == NULL)
+			{
+				abort();
+				return NULL;
+			}
+		}
+		else
+		{
+			abort();
+			return NULL;
+		}
+
+		bool unmap = false;
+		mtx_.Lock();
+		assert(block < segments_sz_);
+		if (segments_[block].base_) {
+			base = segments_[block].base_;
+			unmap = true;
+		}
+		else {
+			base = reinterpret_cast<char*>(ptr);
+			segments_[block].base_ = base;
+			segments_[block].handle = _base_handle;
+			unmap = false;
+		}
+		mtx_.Unlock();
+		if (unmap) {
+			if (!UnmapSegment(reinterpret_cast<char*>(ptr))) {
+				return NULL;
+			}
+		}
+		return base;
+	}
+
+public:
+	PosixMmapFile(const std::string& fname, int fd, size_t page_size)
+		: filename_(fname),
+		fd_(fd),
+		block_size_(Roundup(page_size, 262144)),
+		end_offset_(0),
+		segments_(NULL),
+		segments_sz_(0),
+		trunc_in_progress_(false),
+		trunc_waiters_(0),
+		mtx_(),
+		cnd_(&mtx_) {
+		assert((page_size & (page_size - 1)) == 0);
+	}
+
+	~PosixMmapFile() {
+		PosixMmapFile::Close();
+	}
+
+	virtual Status WriteAt(uint64_t offset, const Slice& data) {
+		const uint64_t end = offset + data.size();
+		const char* src = data.data();
+		uint64_t rem = data.size();
+		mtx_.Lock();
+		end_offset_ = end_offset_ < end ? end : end_offset_;
+		mtx_.Unlock();
+		while (rem > 0) {
+			const uint64_t block = offset / block_size_;
+			char* base = GetSegment(block);
+			if (!base) {
+				return Status::IOError(filename_, "write at");
+			}
+			const uint64_t loff = offset - block * block_size_;
+			uint64_t n = block_size_ - loff;
+			n = n < rem ? n : rem;
+			memmove(base + loff, src, n);
+			rem -= n;
+			src += n;
+			offset += n;
+		}
+		return Status::OK();
+	}
+
+	virtual Status Append(const Slice& data) {
+		mtx_.Lock();
+		uint64_t offset = end_offset_;
+		mtx_.Unlock();
+		return WriteAt(offset, data);
+	}
+
+	virtual Status Close() {
+		Status s;
+		int fd;
+		MmapSegment* segments;
+		size_t end_offset;
+		size_t segments_sz;
+		mtx_.Lock();
+		fd = fd_;
+		fd_ = -1;
+		end_offset = end_offset_;
+		end_offset_ = 0;
+		segments = segments_;
+		segments_ = NULL;
+		segments_sz = segments_sz_;
+		segments_sz_ = 0;
+		mtx_.Unlock();
+		if (fd < 0) {
+			return s;
+		}
+		/*for (size_t i = 0; i < segments_sz; ++i) {
+			if (segments[i].base_ != NULL &&
+				munmap(segments[i].base_, block_size_) < 0) {
+				s = IOError(filename_, errno);
+			}
+		}
+		delete[] segments;
+		if (ftruncate(fd, end_offset) < 0) {
+			s = IOError(filename_, errno);
+		}
+		if (close(fd) < 0) {
+			if (s.ok()) {
+				s = IOError(filename_, errno);
+			}
+		}*/
+
+		for (size_t i = 0; i < segments_sz; ++i) {
+			if (segments[i].base_ != NULL)
+			{
+				int reval = UnmapViewOfFile(segments[i].base_);
+				CloseHandle(segments[i].handle);
+				if (reval == 0)
+				{
+					s = Status::IOError(filename_, "bad close 1");
+				}
+			}
+		}
+		delete[] segments;
+		if (_chsize(fd, end_offset) < 0) {
+			s = Status::IOError(filename_, "bad close 2");
+		}
+		if (close(fd) < 0) {
+			if (s.ok()) {
+				s = Status::IOError(filename_, "bad close 3");
+			}
+		}
+
+
+		return s;
+	}
+
+	Status Flush() {
+		return Status::OK();
+	}
+
+	Status SyncDirIfManifest() {
+		const char* f = filename_.c_str();
+		const char* sep = strrchr(f, '/');
+		Slice basename;
+		std::string dir;
+		if (sep == NULL) {
+			dir = ".";
+			basename = f;
+		}
+		else {
+			dir = std::string(f, sep - f);
+			basename = sep + 1;
+		}
+		Status s;
+		if (basename.starts_with("MANIFEST")) {
+			int fd = open(dir.c_str(), O_RDONLY);
+			/*if (fd < 0) {
+				s = IOError(dir, errno);
+			}
+			else {
+				if (fsync(fd) < 0) {
+					s = IOError(dir, errno);
+				}
+				close(fd);
+			}*/
+			if (fd < 0) {
+				s = Status::IOError(dir, "sync error 1");
+			}
+			else {
+				HANDLE _hFile = (HANDLE)_get_osfhandle(fd);
+				if (FlushFileBuffers(_hFile) == 0) {					
+					s = Status::IOError(dir, "sync error 2");
+				}
+				close(fd);
+			}
+		}
+		return s;
+	}
+
+	virtual Status Sync() {
+		// Ensure new files referred to by the manifest are in the filesystem.
+		Status s = SyncDirIfManifest();
+
+		if (!s.ok()) {
+			return s;
+		}
+
+		size_t block = 0;
+		while (true) {
+			char* base = NULL;
+			mtx_.Lock();
+			if (block < segments_sz_) {
+				base = segments_[block].base_;
+			}
+			mtx_.Unlock();
+			if (!base) {
+				break;
+			}
+			/*if (msync(base, block_size_, MS_SYNC) < 0) {
+				s = IOError(filename_, errno);
+			}*/
+			if (!FlushViewOfFile(base, block_size_)) {
+				s = Status::IOError(filename_, "flush error");
+			}
+			++block;
+		}
+		return s;
+	}
+};
+
+
 class PosixRandomAccessFile: public RandomAccessFile {
  private:
   std::string filename_;
@@ -373,10 +710,70 @@ class PosixEnv : public Env {
     return result;
   }
 
+
+  virtual Status LinkFile(const std::string& src, const std::string& target) {
+	  //Status result;
+	  //if (link(src.c_str(), target.c_str()) != 0) {
+		 // result = Status::IOError(src, ec.message());
+	  //}
+	  //return result;
+
+	  boost::system::error_code ec;
+
+	  boost::filesystem::create_symlink(src, target, ec);
+
+	  Status result;
+
+	  if (ec) {
+		  result = Status::IOError(src, ec.message());
+	  }
+
+	  return result;
+  }
+
+  virtual Status CopyFile(const std::string& src, const std::string& target) {
+	  //Status result;
+	  //if (link(src.c_str(), target.c_str()) != 0) {
+	  // result = Status::IOError(src, ec.message());
+	  //}
+	  //return result;
+
+	  boost::system::error_code ec;
+
+	  boost::filesystem::copy_file(src, target, ec);
+
+	  Status result;
+
+	  if (ec) {
+		  result = Status::IOError(src, ec.message());
+	  }
+
+	  return result;
+  }
+  int getpagesize(void)
+  {
+	  SYSTEM_INFO system_info;
+	  GetSystemInfo(&system_info);
+	  return system_info.dwPageSize;
+  }
+  virtual Status NewConcurrentWritableFile(const std::string& fname, ConcurrentWritableFile** result) {
+	  Status s;
+	  const int fd = open(fname.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0644);
+	  if (fd < 0) {
+		  *result = NULL;
+		  s = Status::IOError(fname, "bad open");
+	  }
+	  else {
+		  *result = new PosixMmapFile(fname, fd, getpagesize());
+	  }
+	  return s;
+  
+  }
+
   virtual Status RenameFile(const std::string& src, const std::string& target) {
     boost::system::error_code ec;
 
-    boost::filesystem::rename(src, target, ec);
+    boost::filesystem:: rename(src, target, ec);
 
     Status result;
 
