@@ -234,8 +234,9 @@ private:
 		void* ptr = NULL;
 		DWORD off_hi = (DWORD)((block * block_size_) >> 32);
 		DWORD off_lo = (DWORD)((block * block_size_) & 0xFFFFFFFF);
+		HANDLE _hFile = (HANDLE)_get_osfhandle(fd_);
 		_base_handle = CreateFileMappingA(
-			_base_handle,
+			_hFile,
 			NULL,
 			PAGE_READWRITE,
 			0,
@@ -436,11 +437,12 @@ public:
 
 	virtual Status Sync() {
 		// Ensure new files referred to by the manifest are in the filesystem.
-		Status s = SyncDirIfManifest();
+		Status s;
+		/*Status s = SyncDirIfManifest();
 
 		if (!s.ok()) {
 			return s;
-		}
+		}*/
 
 		size_t block = 0;
 		while (true) {
@@ -458,6 +460,9 @@ public:
 			}*/
 			if (!FlushViewOfFile(base, block_size_)) {
 				s = Status::IOError(filename_, "flush error");
+			}
+			if (!FlushFileBuffers(segments_[block].handle) == 0) {
+				s = Status::IOError(filename_, "flush error 2");
 			}
 			++block;
 		}
@@ -619,16 +624,27 @@ class PosixEnv : public Env {
 
   virtual Status NewWritableFile(const std::string& fname,
                  WritableFile** result) {
-    Status s;
-    try {
-      // will create a new empty file to write to
-      *result = new BoostFile(fname);
-    }
-    catch (const std::exception & e) {
-      s = Status::IOError(fname, e.what());
-    }
+    //Status s;
+    //try {
+    //  // will create a new empty file to write to
+    //  *result = new BoostFile(fname);
+    //}
+    //catch (const std::exception & e) {
+    //  s = Status::IOError(fname, e.what());
+    //}
+	//return s;
 
-    return s;
+	Status s;
+	const int fd = open(fname.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0644);
+	if (fd < 0) {
+		*result = NULL;
+		s = Status::IOError(fname, "bad open 2");
+	}
+	else {
+		std::cout << "HELLO 1" << std::endl;
+		*result = new PosixMmapFile(fname, fd, getpagesize());
+	}
+	return s;
   }
 
   virtual bool FileExists(const std::string& fname) {

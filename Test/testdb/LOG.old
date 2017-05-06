@@ -1,2 +1,5 @@
-2017/05/06-17:34:56.458 c94 cleaning up CompactMemTableThread
-2017/05/06-17:34:56.459 2058 cleaning up CompactLevelThread
+2017/05/06-21:14:02.652 174c Recovering log #3
+2017/05/06-21:14:02.659 174c Delete type=0 #3
+2017/05/06-21:14:02.659 174c Delete type=3 #1
+2017/05/06-21:14:27.384 1a28 cleaning up CompactLevelThread
+2017/05/06-21:14:27.384 33a8 cleaning up CompactMemTableThread

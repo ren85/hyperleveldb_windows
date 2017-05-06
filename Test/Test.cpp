@@ -13,11 +13,19 @@ int main()
 	leveldb::Options options;
 	options.create_if_missing = true;
 
-	leveldb::Status status = leveldb::DB::Open(options, "./testdb", &db);
+	leveldb::Status status = leveldb::DB::Open(options, "testdb", &db);
 
 	if (false == status.ok())
 	{
-		std::cerr << "Unable to open/create test database './testdb'" << std::endl;
+		std::cerr << "Unable to open/create test database 'testdb'" << std::endl;
+		std::cerr << status.ToString() << std::endl;
+		return -1;
+	}
+
+	status = db->Put(leveldb::WriteOptions(), "a", "b");
+	if (false == status.ok())
+	{
+		std::cerr << "Unable to open/create test database 'testdb'" << std::endl;
 		std::cerr << status.ToString() << std::endl;
 		return -1;
 	}

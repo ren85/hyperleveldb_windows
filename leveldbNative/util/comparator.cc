@@ -94,9 +94,10 @@ namespace leveldb {
 	static void InitModule() {
 		bytewise = new BytewiseComparatorImpl;
 	}
-
+	static port::OnceType once = LEVELDB_ONCE_INIT;
 	const Comparator* BytewiseComparator() {
 		/*port::InitOnce(&once, InitModule);*/
+		port::InitOnce(&once, InitModule);
 		return bytewise;
 	}
 

@@ -45,6 +45,10 @@ namespace port {
 // Windows is little endian (for now :p)
 static const bool kLittleEndian = true;
 
+typedef void* OnceType;
+#define LEVELDB_ONCE_INIT 0
+extern void InitOnce(port::OnceType*, void(*initializer)());
+
 class CondVar;
 
 class Mutex {

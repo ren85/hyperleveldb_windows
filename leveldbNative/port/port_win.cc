@@ -141,5 +141,14 @@ void AtomicPointer::NoBarrier_Store(void* v) {
   rep_ = v;
 }
 
+BOOL CALLBACK InitHandleFunction(PINIT_ONCE InitOnce, PVOID func, PVOID *lpContext) {
+	((void(*)())func)();
+	return true;
+}
+
+void InitOnce(OnceType* once, void(*initializer)()) {
+	InitOnceExecuteOnce((PINIT_ONCE)once, InitHandleFunction, initializer, NULL);
+}
+
 }
 }
