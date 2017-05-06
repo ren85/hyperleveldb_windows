@@ -1,5 +1,0 @@
-C:\Users\renbo\Desktop\LevelDB-master\Debug\LevelDBUnitTests.dll
-C:\Users\renbo\Desktop\LevelDB-master\Debug\LevelDBUnitTests.pdb
-C:\Users\renbo\Desktop\LevelDB-master\LevelDBUnitTests\obj\Debug\LevelDBUnitTests.csprojResolveAssemblyReference.cache
-C:\Users\renbo\Desktop\LevelDB-master\LevelDBUnitTests\obj\Debug\LevelDBUnitTests.dll
-C:\Users\renbo\Desktop\LevelDB-master\LevelDBUnitTests\obj\Debug\LevelDBUnitTests.pdb

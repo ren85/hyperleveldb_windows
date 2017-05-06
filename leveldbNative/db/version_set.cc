@@ -20,6 +20,7 @@
 #include "table/two_level_iterator.h"
 #include "util/coding.h"
 #include "util/logging.h"
+#include <iostream>
 
 namespace leveldb {
 
@@ -1025,17 +1026,20 @@ namespace leveldb {
 			log::Reader reader(file, &reporter, true/*checksum*/, 0/*initial_offset*/);
 			Slice record;
 			std::string scratch;
+
 			while (reader.ReadRecord(&record, &scratch) && s.ok()) {
 				VersionEdit edit;
 				s = edit.DecodeFrom(record);
 				if (s.ok()) {
-					if (edit.has_comparator_ &&
+					std::cout << (icmp_.user_comparator() == nullptr) << std::endl;
+					if (edit.has_comparator_ && 
 						edit.comparator_ != icmp_.user_comparator()->Name()) {
 						s = Status::InvalidArgument(
 							edit.comparator_ + " does not match existing comparator ",
 							icmp_.user_comparator()->Name());
 					}
 				}
+
 
 				if (s.ok()) {
 					builder.Apply(&edit);

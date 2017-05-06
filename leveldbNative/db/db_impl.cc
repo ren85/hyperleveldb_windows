@@ -375,7 +375,6 @@ namespace leveldb {
 
 	Status DBImpl::Recover(VersionEdit* edit) {
 		mutex_.AssertHeld();
-
 		// Ignore error from CreateDir since the creation of the DB is
 		// committed only when the descriptor is created, and this directory
 		// may already exist from a previous failed creation attempt.
@@ -1963,11 +1962,13 @@ namespace leveldb {
 	Status DB::Open(const Options& options, const std::string& dbname,
 		DB** dbptr) {
 		*dbptr = NULL;
-
+		std::cout << "HELLO 0" << std::endl;
 		DBImpl* impl = new DBImpl(options, dbname);
 		impl->mutex_.Lock();
 		VersionEdit edit;
+
 		Status s = impl->Recover(&edit); // Handles create_if_missing, error_if_exists
+		std::cout << "HELLO 3" << std::endl;
 		if (s.ok()) {
 			uint64_t new_log_number = impl->versions_->NewFileNumber();
 			ConcurrentWritableFile* lfile;

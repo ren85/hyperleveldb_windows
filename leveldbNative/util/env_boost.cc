@@ -764,6 +764,7 @@ class PosixEnv : public Env {
 		  s = Status::IOError(fname, "bad open");
 	  }
 	  else {
+		  std::cout << "HELLO 1" << std::endl;
 		  *result = new PosixMmapFile(fname, fd, getpagesize());
 	  }
 	  return s;
