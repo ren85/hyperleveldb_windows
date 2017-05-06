@@ -327,7 +327,7 @@ inline uint32_t
 compare_and_swap_32_nobarrier(volatile uint32_t* ptr, uint32_t old_value, uint32_t new_value)
 {
 #ifdef _MSC_VER
-    return InterlockedCompareExchange(ptr, old_value, new_value);
+    return InterlockedCompareExchange(ptr, new_value, old_value);
 #else
     uint32_t prev;
     __asm__ __volatile__("lock; cmpxchgl %1,%2"
@@ -342,7 +342,7 @@ inline uint32_t
 compare_and_swap_32_acquire(volatile uint32_t* ptr, uint32_t old_value, uint32_t new_value)
 {
 #ifdef _MSC_VER
-    return InterlockedCompareExchangeAcquire(ptr, old_value, new_value);
+    return InterlockedCompareExchangeAcquire(ptr, new_value, old_value);
 #else
     uint32_t x = compare_and_swap_32_nobarrier(ptr, old_value, new_value);
 
@@ -365,7 +365,7 @@ inline uint64_t
 compare_and_swap_64_nobarrier(volatile uint64_t* ptr, uint64_t old_value, uint64_t new_value)
 {
 #ifdef _MSC_VER
-    return InterlockedCompareExchange64((volatile __int64*)ptr, old_value, new_value);
+    return InterlockedCompareExchange64((volatile __int64*)ptr, new_value, old_value);
 #elif defined(__x86_64__)
     uint64_t prev;
     __asm__ __volatile__("lock; cmpxchgq %1,%2"
@@ -382,7 +382,7 @@ inline uint64_t
 compare_and_swap_64_acquire(volatile uint64_t* ptr, uint64_t old_value, uint64_t new_value)
 {
 #ifdef _MSC_VER
-    return InterlockedCompareExchangeAcquire64((volatile __int64*)ptr, old_value, new_value);
+    return InterlockedCompareExchangeAcquire64((volatile __int64*)ptr, new_value, old_value);
 #else
     uint64_t x = compare_and_swap_64_nobarrier(ptr, old_value, new_value);
 
@@ -399,7 +399,7 @@ inline uint64_t
 compare_and_swap_64_release(volatile uint64_t* ptr, uint64_t old_value, uint64_t new_value)
 {
 #ifdef _MSC_VER
-    return InterlockedCompareExchangeRelease64((volatile __int64*)ptr, old_value, new_value);
+    return InterlockedCompareExchangeRelease64((volatile __int64*)ptr, new_value, old_value);
 #else
     return compare_and_swap_64_nobarrier(ptr, old_value, new_value);
 #endif
@@ -410,7 +410,7 @@ inline P*
 compare_and_swap_ptr_nobarrier(P* volatile* ptr, P* old_value, P* new_value)
 {
 #ifdef _MSC_VER
-    return (P*)InterlockedCompareExchangePointer((PVOID *)ptr, (PVOID)old_value, (PVOID)new_value);
+    return (P*)InterlockedCompareExchangePointer((PVOID *)ptr, (PVOID)new_value, (PVOID)old_value);
 #elif defined(__x86_64__)
     P* prev;
     __asm__ __volatile__("lock; cmpxchgq %1,%2"
@@ -433,7 +433,7 @@ inline P*
 compare_and_swap_ptr_acquire(P* volatile* ptr, P* old_value, P* new_value)
 {
 #ifdef _MSC_VER
-    return (P*)InterlockedCompareExchangePointerAcquire((PVOID *)ptr, (PVOID)old_value, (PVOID)new_value);
+    return (P*)InterlockedCompareExchangePointerAcquire((PVOID *)ptr, (PVOID)new_value, (PVOID)old_value);
 #else
     P* x = compare_and_swap_ptr_nobarrier(ptr, old_value, new_value);
 
@@ -451,7 +451,7 @@ inline P*
 compare_and_swap_ptr_release(P* volatile* ptr, P* old_value, P* new_value)
 {
 #ifdef _MSC_VER
-    return (P*)InterlockedCompareExchangePointerRelease((PVOID *)ptr, (PVOID)old_value, (PVOID)new_value);
+    return (P*)InterlockedCompareExchangePointerRelease((PVOID *)ptr, (PVOID)new_value, (PVOID)old_value);
 #else
     return compare_and_swap_ptr_nobarrier(ptr, old_value, new_value);
 #endif
@@ -461,7 +461,7 @@ template <typename P>
 inline P*
 compare_and_swap_ptr_fullbarrier(P* volatile* ptr, P* old_value, P* new_value)
 {
-	return (P*)InterlockedCompareExchangePointerRelease((PVOID *)ptr, (PVOID)old_value, (PVOID)new_value);
+	return (P*)InterlockedCompareExchangePointerRelease((PVOID *)ptr, (PVOID)new_value, (PVOID)old_value);
 }
 
 //////////////////////////////// Atomic Exchange ///////////////////////////////

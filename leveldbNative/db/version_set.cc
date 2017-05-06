@@ -1031,7 +1031,6 @@ namespace leveldb {
 				VersionEdit edit;
 				s = edit.DecodeFrom(record);
 				if (s.ok()) {
-					std::cout << (icmp_.user_comparator() == nullptr) << std::endl;
 					if (edit.has_comparator_ && 
 						edit.comparator_ != icmp_.user_comparator()->Name()) {
 						s = Status::InvalidArgument(

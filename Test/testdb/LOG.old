@@ -1,5 +1,7 @@
-2017/05/06-21:14:02.652 174c Recovering log #3
-2017/05/06-21:14:02.659 174c Delete type=0 #3
-2017/05/06-21:14:02.659 174c Delete type=3 #1
-2017/05/06-21:14:27.384 1a28 cleaning up CompactLevelThread
-2017/05/06-21:14:27.384 33a8 cleaning up CompactMemTableThread
+2017/05/06-22:45:02.206 2cd0 Recovering log #6
+2017/05/06-22:45:02.207 2cd0 Level-0 table #8: started
+2017/05/06-22:45:02.212 2cd0 Level-0 table #8: 114 bytes OK
+2017/05/06-22:45:02.219 2cd0 Delete type=0 #6
+2017/05/06-22:45:02.219 2cd0 Delete type=3 #4
+2017/05/06-22:45:02.220 1410 cleaning up CompactLevelThread
+2017/05/06-22:45:02.220 a64 cleaning up CompactMemTableThread

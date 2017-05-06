@@ -1,5 +1,5 @@
-c:\users\renbo\desktop\hyperleveldb_windows\leveldbnative\debug\leveldb.native.pdb
-c:\users\renbo\desktop\hyperleveldb_windows\leveldbnative\debug\leveldb.native.idb
+c:\users\renbo\desktop\hyperleveldb_windows\leveldbnative\debug\vc140.pdb
+c:\users\renbo\desktop\hyperleveldb_windows\leveldbnative\debug\vc140.idb
 c:\users\renbo\desktop\hyperleveldb_windows\leveldbnative\debug\two_level_iterator.obj
 c:\users\renbo\desktop\hyperleveldb_windows\leveldbnative\debug\arena.obj
 c:\users\renbo\desktop\hyperleveldb_windows\leveldbnative\debug\atomic.obj
@@ -49,9 +49,14 @@ c:\users\renbo\desktop\hyperleveldb_windows\leveldbnative\debug\extensions.obj
 c:\users\renbo\desktop\hyperleveldb_windows\leveldbnative\debug\filename.obj
 c:\users\renbo\desktop\hyperleveldb_windows\leveldbnative\debug\log_reader.obj
 c:\users\renbo\desktop\hyperleveldb_windows\debug\leveldb.lib
+c:\users\renbo\desktop\hyperleveldb_windows\debug\leveldb.exp
+c:\users\renbo\desktop\hyperleveldb_windows\debug\leveldb.ilk
+c:\users\renbo\desktop\hyperleveldb_windows\debug\leveldb.dll
+c:\users\renbo\desktop\hyperleveldb_windows\debug\leveldb.pdb
 c:\users\renbo\desktop\hyperleveldb_windows\leveldbnative\debug\leveldb.native.tlog\cl.command.1.tlog
 c:\users\renbo\desktop\hyperleveldb_windows\leveldbnative\debug\leveldb.native.tlog\cl.read.1.tlog
 c:\users\renbo\desktop\hyperleveldb_windows\leveldbnative\debug\leveldb.native.tlog\cl.write.1.tlog
-c:\users\renbo\desktop\hyperleveldb_windows\leveldbnative\debug\leveldb.native.tlog\lib-link.read.1.tlog
-c:\users\renbo\desktop\hyperleveldb_windows\leveldbnative\debug\leveldb.native.tlog\lib-link.write.1.tlog
-c:\users\renbo\desktop\hyperleveldb_windows\leveldbnative\debug\leveldb.native.tlog\lib.command.1.tlog
+c:\users\renbo\desktop\hyperleveldb_windows\leveldbnative\debug\leveldb.native.tlog\leveldb.native.write.1u.tlog
+c:\users\renbo\desktop\hyperleveldb_windows\leveldbnative\debug\leveldb.native.tlog\link.command.1.tlog
+c:\users\renbo\desktop\hyperleveldb_windows\leveldbnative\debug\leveldb.native.tlog\link.read.1.tlog
+c:\users\renbo\desktop\hyperleveldb_windows\leveldbnative\debug\leveldb.native.tlog\link.write.1.tlog

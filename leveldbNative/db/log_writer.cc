@@ -50,7 +50,7 @@ namespace leveldb {
 						slice.size() + kHeaderSize - left);
 				}
 				//if (__sync_bool_compare_and_swap(&offset_, start_offset, end_offset)) {
-				if (atomic::compare_and_swap_64_release(&offset_, end_offset, start_offset) == start_offset) {
+				if (atomic::compare_and_swap_64_release(&offset_, start_offset, end_offset) == start_offset) {
 					break;
 				}
 			}
