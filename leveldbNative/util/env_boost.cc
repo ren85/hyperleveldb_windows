@@ -469,44 +469,125 @@ public:
 		return s;
 	}
 };
-
+#define DISALLOW_COPY_AND_ASSIGN(TypeName) \
+  TypeName(const TypeName&);               \
+  void operator=(const TypeName&)
 
 class PosixRandomAccessFile: public RandomAccessFile {
- private:
-  std::string filename_;
-  int fd_;
-  mutable boost::mutex mu_;
-
- public:
-  PosixRandomAccessFile(const std::string& fname, int fd)
-    : filename_(fname), fd_(fd) { }
-  virtual ~PosixRandomAccessFile() { close(fd_); }
-
-  virtual Status Read(uint64_t offset, size_t n, Slice* result,
-            char* scratch) const {
-    Status s;
-#ifdef WIN32
-    // no pread on Windows so we emulate it with a mutex
-    boost::unique_lock<boost::mutex> lock(mu_);
-
-    if (::_lseeki64(fd_, offset, SEEK_SET) == -1L) {
-      return Status::IOError(filename_, strerror(errno));
-    }
-
-    int r = ::_read(fd_, scratch, n);
-    *result = Slice(scratch, (r < 0) ? 0 : r);
-    lock.unlock();
-#else
-    ssize_t r = pread(fd_, scratch, n, static_cast<off_t>(offset));
-    *result = Slice(scratch, (r < 0) ? 0 : r);
-#endif
-    if (r < 0) {
-      // An error: return a non-ok status
-      s = Status::IOError(filename_, strerror(errno));
-    }
-    return s;
-  }
+// private:
+//  std::string filename_;
+//  int fd_;
+//  mutable boost::mutex mu_;
+//
+// public:
+//  PosixRandomAccessFile(const std::string& fname, int fd)
+//    : filename_(fname), fd_(fd) { }
+//  virtual ~PosixRandomAccessFile() { close(fd_); }
+//
+//  virtual Status Read(uint64_t offset, size_t n, Slice* result,
+//            char* scratch) const {
+//    Status s;
+//#ifdef WIN32
+//    // no pread on Windows so we emulate it with a mutex
+//    boost::unique_lock<boost::mutex> lock(mu_);
+//
+//    if (::_lseeki64(fd_, offset, SEEK_SET) == -1L) {
+//      return Status::IOError(filename_, strerror(errno));
+//    }
+//
+//    int r = ::_read(fd_, scratch, n);
+//    *result = Slice(scratch, (r < 0) ? 0 : r);
+//    lock.unlock();
+//#else
+//    ssize_t r = pread(fd_, scratch, n, static_cast<off_t>(offset));
+//    *result = Slice(scratch, (r < 0) ? 0 : r);
+//#endif
+//    if (r < 0) {
+//      // An error: return a non-ok status
+//      s = Status::IOError(filename_, strerror(errno));
+//    }
+//    return s;
+//  }
+public:
+	friend class PosixEnv;
+	virtual ~PosixRandomAccessFile();
+	virtual Status Read(uint64_t offset, size_t n, Slice* result, char* scratch) const;
+	BOOL isEnable();
+private:
+	BOOL _Init(LPCWSTR path);
+	void _CleanUp();
+	PosixRandomAccessFile(const std::string& fname);
+	HANDLE _hFile;
+	const std::string _filename;
+	DISALLOW_COPY_AND_ASSIGN(PosixRandomAccessFile);
 };
+
+void ToWidePath(const std::string& value, std::wstring& target) {
+	wchar_t buffer[MAX_PATH];
+	MultiByteToWideChar(CP_ACP, 0, value.c_str(), -1, buffer, MAX_PATH);
+	target = buffer;
+}
+
+void ToNarrowPath(const std::wstring& value, std::string& target) {
+	char buffer[MAX_PATH];
+	WideCharToMultiByte(CP_ACP, 0, value.c_str(), -1, buffer, MAX_PATH, NULL, NULL);
+	target = buffer;
+}
+
+PosixRandomAccessFile::PosixRandomAccessFile(const std::string& fname) :
+	_filename(fname), _hFile(NULL)
+{
+	std::wstring path;
+	ToWidePath(fname, path);
+	_Init(path.c_str());
+}
+
+PosixRandomAccessFile::~PosixRandomAccessFile()
+{
+	_CleanUp();
+}
+
+Status PosixRandomAccessFile::Read(uint64_t offset, size_t n, Slice* result, char* scratch) const
+{
+	Status sRet;
+	OVERLAPPED ol = { 0 };
+	ZeroMemory(&ol, sizeof(ol));
+	ol.Offset = (DWORD)offset;
+	ol.OffsetHigh = (DWORD)(offset >> 32);
+	DWORD hasRead = 0;
+	if (!ReadFile(_hFile, scratch, n, &hasRead, &ol))
+		sRet = Status::IOError(_filename, /*Win32::GetLastErrSz()*/"error read random file");
+	else
+		*result = Slice(scratch, hasRead);
+	return sRet;
+}
+
+BOOL PosixRandomAccessFile::_Init(LPCWSTR path)
+{
+	BOOL bRet = FALSE;
+	if (!_hFile)
+		_hFile = ::CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS, NULL);
+	if (!_hFile || _hFile == INVALID_HANDLE_VALUE)
+		_hFile = NULL;
+	else
+		bRet = TRUE;
+	return bRet;
+}
+
+BOOL PosixRandomAccessFile::isEnable()
+{
+	return _hFile ? TRUE : FALSE;
+}
+
+void PosixRandomAccessFile::_CleanUp()
+{
+	if (_hFile) {
+		::CloseHandle(_hFile);
+		_hFile = NULL;
+	}
+}
+
 
 // We preallocate up to an extra megabyte and use memcpy to append new
 // data to the file.  This is safe since we either properly close the
@@ -587,6 +668,18 @@ class BoostFileLock : public FileLock {
   boost::interprocess::file_lock fl_;
 };
 
+//void ToWidePath(const std::string& value, std::wstring& target) {
+//	wchar_t buffer[MAX_PATH];
+//	MultiByteToWideChar(CP_ACP, 0, value.c_str(), -1, buffer, MAX_PATH);
+//	target = buffer;
+//}
+//
+//void ToNarrowPath(const std::wstring& value, std::string& target) {
+//	char buffer[MAX_PATH];
+//	WideCharToMultiByte(CP_ACP, 0, value.c_str(), -1, buffer, MAX_PATH, NULL, NULL);
+//	target = buffer;
+//}
+
 std::string GetCurrentDir();
 static const std::string CurrentDir = GetCurrentDir();
 std::string GetCurrentDir()
@@ -618,17 +711,28 @@ class PosixEnv : public Env {
 
   virtual Status NewRandomAccessFile(const std::string& fname,
                    RandomAccessFile** result) {
-#ifdef WIN32
-    int fd = _open(fname.c_str(), _O_RDONLY | _O_RANDOM | _O_BINARY);
-#else
-    int fd = open(fname.c_str(), O_RDONLY);
-#endif
-    if (fd < 0) {
-      *result = NULL;
-      return Status::IOError(fname, strerror(errno));
-    }
-    *result = new PosixRandomAccessFile(fname, fd);
-    return Status::OK();
+//#ifdef WIN32
+//    int fd = _open(fname.c_str(), _O_RDONLY | _O_RANDOM | _O_BINARY);
+//#else
+//    int fd = open(fname.c_str(), O_RDONLY);
+//#endif
+//    if (fd < 0) {
+//      *result = NULL;
+//      return Status::IOError(fname, strerror(errno));
+//    }
+//    *result = new PosixRandomAccessFile(fname, fd);
+//    return Status::OK();
+	  Status sRet;
+	  std::string path = fname;
+	  PosixRandomAccessFile* pFile = new PosixRandomAccessFile(ModifyPath(path));
+	  if (!pFile->isEnable()) {
+		  delete pFile;
+		  *result = NULL;
+		  sRet = Status::IOError(path, "Could not create random access file.");
+	  }
+	  else
+		  *result = pFile;
+	  return sRet;
   }
 
   //void ToNarrowPath(const std::wstring& value, std::string& target) {
@@ -659,6 +763,12 @@ class PosixEnv : public Env {
   void ToWidePath(const std::string& value, std::wstring& target) {
 	  wchar_t buffer[MAX_PATH];
 	  MultiByteToWideChar(CP_ACP, 0, value.c_str(), -1, buffer, MAX_PATH);
+	  target = buffer;
+  }
+
+  void ToNarrowPath(const std::wstring& value, std::string& target) {
+	  char buffer[MAX_PATH];
+	  WideCharToMultiByte(CP_ACP, 0, value.c_str(), -1, buffer, MAX_PATH, NULL, NULL);
 	  target = buffer;
   }
   std::string& ModifyPath(std::string& path)

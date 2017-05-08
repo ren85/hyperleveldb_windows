@@ -58,6 +58,13 @@ namespace leveldb {
 		void NewFileErrorDuringWrite();
 		void TableFile();
 		void TableFileRepair();
+		void TableFileIndexData();
+		void MissingDescriptor();
+		void SequenceNumberRecovery();
+		void CorruptedDescriptor();
+		void CompactionInputError();
+		void CompactionInputErrorParanoid();
+		void UnrelatedKeys();
 	};
 }
 #endif  // STORAGE_LEVELDB_UTIL_TESTHARNESS_H_

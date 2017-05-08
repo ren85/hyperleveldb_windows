@@ -105,6 +105,7 @@
     <ClCompile Include="db\dbformat.cc" />
     <ClCompile Include="db\db_impl.cc" />
     <ClCompile Include="db\db_iter.cc" />
+    <ClCompile Include="db\db_test.cc" />
     <ClCompile Include="db\extensions.cc" />
     <ClCompile Include="db\filename.cc" />
     <ClCompile Include="db\log_reader.cc" />
@@ -156,6 +157,7 @@
     <ClInclude Include="db\dbformat.h" />
     <ClInclude Include="db\db_impl.h" />
     <ClInclude Include="db\db_iter.h" />
+    <ClInclude Include="db\db_test.h" />
     <ClInclude Include="db\filename.h" />
     <ClInclude Include="db\log_format.h" />
     <ClInclude Include="db\log_reader.h" />

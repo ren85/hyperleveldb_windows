@@ -11,7 +11,8 @@
 
 #include "db/autocompact_test.h"
 #include "db/corruption_test.h"
-
+#include "db/db_test.h"
+#include <iostream>
 namespace leveldb {
 	namespace test {
 
@@ -57,26 +58,58 @@ namespace leveldb {
 			//	}
 			//}
 
-			//AutoCompactTest *ac = new AutoCompactTest();
-			//ac->DoReads(ac->kCount);
-			//delete ac;
+			std::cout << "==========AutoCompactTest==========" << std::endl;
+			AutoCompactTest *ac = new AutoCompactTest();
+			ac->DoReads(ac->kCount);
+			delete ac;
 
-			//CorruptionTest *ct = new CorruptionTest();
-			//ct->RecoveryTest();
-			//delete ct;
-			//ct = new CorruptionTest();
-			//ct->RecoverWriteError();
-			//delete ct;
-			//ct = new CorruptionTest();
-			//ct->NewFileErrorDuringWrite();
-			//delete ct;
-			//ct = new CorruptionTest();
-			//ct->TableFile();
-			//delete ct;
+			std::cout << "==========CorruptionTest==========" << std::endl;
 			CorruptionTest *ct = new CorruptionTest();
+			ct->RecoveryTest();
+			delete ct;
+			ct = new CorruptionTest();
+			ct->RecoverWriteError();
+			delete ct;
+			ct = new CorruptionTest();
+			ct->NewFileErrorDuringWrite();
+			delete ct;
+			ct = new CorruptionTest();
+			ct->TableFile();
+			delete ct;
+			ct = new CorruptionTest();
 			ct->TableFileRepair();
 			delete ct;
+			ct = new CorruptionTest();
+			ct->TableFileIndexData();
+			delete ct;
+			ct = new CorruptionTest();
+			ct->MissingDescriptor();
+			delete ct;
+			ct = new CorruptionTest();
+			ct->SequenceNumberRecovery();
+			delete ct;
+			ct = new CorruptionTest();
+			ct->CorruptedDescriptor();
+			delete ct;
+			ct = new CorruptionTest();
+			ct->CompactionInputError();
+			delete ct;
+			ct = new CorruptionTest();
+			ct->CompactionInputErrorParanoid();
+			delete ct;
+			ct = new CorruptionTest();
+			ct->UnrelatedKeys();
+			delete ct;
 
+			std::cout << "==========DbTest==========" << std::endl;
+			DBTestRunner *dt = new DBTestRunner();
+			dt->RunAllTests();
+			delete dt;
+			
+			
+			
+
+			
 			
 
 
