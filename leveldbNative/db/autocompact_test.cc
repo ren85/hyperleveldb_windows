@@ -9,17 +9,11 @@
 #include "leveldb/cache.h"
 #include "util/testharness.h"
 #include "util/testutil.h"
+#include "db/autocompact_test.h"
 
 namespace leveldb {
 
-class AutoCompactTest {
- public:
-  std::string dbname_;
-  Cache* tiny_cache_;
-  Options options_;
-  DB* db_;
-
-  AutoCompactTest() {
+  AutoCompactTest::AutoCompactTest() {
     dbname_ = test::TmpDir() + "/autocompact_test";
     tiny_cache_ = NewLRUCache(100);
     options_.block_cache = tiny_cache_;
@@ -29,31 +23,27 @@ class AutoCompactTest {
     ASSERT_OK(DB::Open(options_, dbname_, &db_));
   }
 
-  ~AutoCompactTest() {
+  AutoCompactTest::~AutoCompactTest() {
     delete db_;
     DestroyDB(dbname_, Options());
     delete tiny_cache_;
   }
 
-  std::string Key(int i) {
+  std::string AutoCompactTest::Key(int i) {
     char buf[100];
     snprintf(buf, sizeof(buf), "key%06d", i);
     return std::string(buf);
   }
 
-  uint64_t Size(const Slice& start, const Slice& limit) {
+  uint64_t AutoCompactTest::Size(const Slice& start, const Slice& limit) {
     Range r(start, limit);
     uint64_t size;
     db_->GetApproximateSizes(&r, 1, &size);
     return size;
   }
 
-  void DoReads(int n);
-};
 
-static const int kValueSize = 200 * 1024;
-static const int kTotalSize = 100 * 1024 * 1024;
-static const int kCount = kTotalSize / kValueSize;
+
 
 // Read through the first n keys repeatedly and check that they get
 // compacted (verified by checking the size of the key space).
@@ -105,18 +95,16 @@ void AutoCompactTest::DoReads(int n) {
   ASSERT_GE(final_other_size, initial_other_size/5 - 1048576);
 }
 
-TEST(AutoCompactTest, ReadAll) {
-  DoReads(kCount);
-}
-
-#if 0
-TEST(AutoCompactTest, ReadHalf) {
-  DoReads(kCount/2);
-}
-#endif
+//TEST(AutoCompactTest, ReadAll) {
+//  DoReads(kCount);
+//}
+//
+//TEST(AutoCompactTest, ReadHalf) {
+//  DoReads(kCount/2);
+//}
 
 }  // namespace leveldb
 
-int main(int argc, char** argv) {
-  return leveldb::test::RunAllTests();
-}
+//int main(int argc, char** argv) {
+//  return leveldb::test::RunAllTests();
+//}

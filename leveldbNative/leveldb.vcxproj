@@ -18,7 +18,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v140</PlatformToolset>
   </PropertyGroup>
@@ -39,7 +39,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <TargetExt>.dll</TargetExt>
+    <TargetExt>.lib</TargetExt>
     <TargetName>LevelDB</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -98,8 +98,10 @@
     <None Include="nativeleveldb\Exports.def" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="db\autocompact_test.cc" />
     <ClCompile Include="db\builder.cc" />
     <ClCompile Include="db\c.cc" />
+    <ClCompile Include="db\corruption_test.cc" />
     <ClCompile Include="db\dbformat.cc" />
     <ClCompile Include="db\db_impl.cc" />
     <ClCompile Include="db\db_iter.cc" />
@@ -148,7 +150,9 @@
     <ClCompile Include="util\win_logger.cc" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="db\autocompact_test.h" />
     <ClInclude Include="db\builder.h" />
+    <ClInclude Include="db\corruption_test.h" />
     <ClInclude Include="db\dbformat.h" />
     <ClInclude Include="db\db_impl.h" />
     <ClInclude Include="db\db_iter.h" />

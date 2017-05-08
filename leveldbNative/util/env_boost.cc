@@ -587,6 +587,15 @@ class BoostFileLock : public FileLock {
   boost::interprocess::file_lock fl_;
 };
 
+std::string GetCurrentDir();
+static const std::string CurrentDir = GetCurrentDir();
+std::string GetCurrentDir()
+{
+	CHAR path[MAX_PATH];
+	::GetModuleFileNameA(::GetModuleHandleA(NULL), path, MAX_PATH);
+	*strrchr(path, '\\') = 0;
+	return std::string(path);
+}
 class PosixEnv : public Env {
  public:
   PosixEnv();
@@ -622,6 +631,45 @@ class PosixEnv : public Env {
     return Status::OK();
   }
 
+  //void ToNarrowPath(const std::wstring& value, std::string& target) {
+	 // char buffer[MAX_PATH];
+	 // WideCharToMultiByte(CP_ACP, 0, value.c_str(), -1, buffer, MAX_PATH, NULL, NULL);
+	 // target = buffer;
+  //}
+  //std::string GetLastErrSz()
+  //{
+	 // LPWSTR lpMsgBuf;
+	 // FormatMessageW(
+		//  FORMAT_MESSAGE_ALLOCATE_BUFFER |
+		//  FORMAT_MESSAGE_FROM_SYSTEM |
+		//  FORMAT_MESSAGE_IGNORE_INSERTS,
+		//  NULL,
+		//  GetLastError(),
+		//  0, // Default language
+		//  (LPWSTR)&lpMsgBuf,
+		//  0,
+		//  NULL
+	 // );
+	 // std::string Err;
+	 // ToNarrowPath(lpMsgBuf, Err);
+	 // LocalFree(lpMsgBuf);
+	 // return Err;
+  //}
+
+  void ToWidePath(const std::string& value, std::wstring& target) {
+	  wchar_t buffer[MAX_PATH];
+	  MultiByteToWideChar(CP_ACP, 0, value.c_str(), -1, buffer, MAX_PATH);
+	  target = buffer;
+  }
+  std::string& ModifyPath(std::string& path)
+  {
+	  if (path[0] == '/' || path[0] == '\\') {
+		  path = CurrentDir + path;
+	  }
+	  std::replace(path.begin(), path.end(), '/', '\\');
+
+	  return path;
+  }
   virtual Status NewWritableFile(const std::string& fname,
                  WritableFile** result) {
     //Status s;
@@ -635,13 +683,32 @@ class PosixEnv : public Env {
 	//return s;
 
 	Status s;
-	const int fd = open(fname.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0644);
-	if (fd < 0) {
+	//const int fd = _open(fname.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0644);
+	std::wstring path;
+	ToWidePath(fname.c_str(), path);
+	DWORD Flag = boost::filesystem::exists(fname) ? OPEN_EXISTING : CREATE_ALWAYS;
+	HANDLE _hFile = CreateFileW(path.c_str(),
+		GENERIC_READ | GENERIC_WRITE,
+		FILE_SHARE_READ | FILE_SHARE_DELETE | FILE_SHARE_WRITE,
+		NULL,
+		Flag,
+		FILE_ATTRIBUTE_NORMAL,
+		NULL);
+	if (!_hFile)
+	{
 		*result = NULL;
-		s = Status::IOError(fname, "bad open 2");
+		s = Status::IOError(fname, "bad open 2: ");
 	}
-	else {
-		*result = new PosixMmapFile(fname, fd, getpagesize());
+	else
+	{
+		int fd = _open_osfhandle(reinterpret_cast<intptr_t>(_hFile), 0644);
+		if (fd < 0) {
+			*result = NULL;
+			s = Status::IOError(fname, "bad open 2: ");
+		}
+		else {
+			*result = new PosixMmapFile(fname, fd, getpagesize());
+		}
 	}
 	return s;
   }
@@ -773,7 +840,7 @@ class PosixEnv : public Env {
   }
   virtual Status NewConcurrentWritableFile(const std::string& fname, ConcurrentWritableFile** result) {
 	  Status s;
-	  const int fd = open(fname.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0644);
+	  const int fd = _open(fname.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0644);
 	  if (fd < 0) {
 		  *result = NULL;
 		  s = Status::IOError(fname, "bad open");
@@ -786,17 +853,36 @@ class PosixEnv : public Env {
   }
 
   virtual Status RenameFile(const std::string& src, const std::string& target) {
-    boost::system::error_code ec;
+    //boost::system::error_code ec;
 
-    boost::filesystem:: rename(src, target, ec);
+    //boost::filesystem:: rename(src, target, ec);
 
-    Status result;
+    //Status result;
 
-    if (ec) {
-      result = Status::IOError(src, ec.message());
-    }
+    //if (ec) {
+    //  result = Status::IOError(src, ec.message());
+    //}
 
-    return result;
+    //return result;
+	  Status sRet;
+	  std::string src_path = src;
+	  std::wstring wsrc_path;
+	  ToWidePath(ModifyPath(src_path), wsrc_path);
+	  std::string target_path = target;
+	  std::wstring wtarget_path;
+	  ToWidePath(ModifyPath(target_path), wtarget_path);
+
+	  if (!MoveFileW(wsrc_path.c_str(), wtarget_path.c_str())) {
+		  DWORD err = GetLastError();
+		  if (err == 0x000000b7) {
+			  if (!::DeleteFileW(wtarget_path.c_str()))
+				  sRet = Status::IOError(src, "Could not rename file.");
+			  else if (!::MoveFileW(wsrc_path.c_str(),
+				  wtarget_path.c_str()))
+				  sRet = Status::IOError(src, "Could not rename file.");
+		  }
+	  }
+	  return sRet;
   }
 
   virtual Status LockFile(const std::string& fname, FileLock** lock) {

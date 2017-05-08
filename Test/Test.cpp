@@ -10,8 +10,7 @@
 
 int main()
 {
-	//leveldb::test::RegisterTest(#base, #name, &TCONCAT(_Test_, name)::_RunIt); 
-	//return leveldb::test::RunAllTests();
+	return leveldb::test::RunAllTests();
 
 
 	//leveldb::DB* db;
