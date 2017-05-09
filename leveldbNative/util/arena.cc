@@ -32,7 +32,7 @@ namespace leveldb {
 			(void)r;
 			if (base) {
 				UnmapViewOfFile(base);
-				CloseHandle(h_mapping);
+				//CloseHandle(h_mapping);
 				//munmap(base, size);
 			}
 		}

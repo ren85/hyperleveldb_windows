@@ -3,7 +3,9 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
 #define __STDC_LIMIT_MACROS
+#define _CRT_SECURE_NO_WARNINGS 
 
+#include "port/port_win.h"
 #include "leveldb/db.h"
 #include "leveldb/filter_policy.h"
 #include "db/db_impl.h"
@@ -18,8 +20,6 @@
 #include "util/mutexlock.h"
 #include "util/testharness.h"
 #include "util/testutil.h"
-#include "db/db_test.h"
-#include <iostream>
 
 namespace leveldb {
 
@@ -217,8 +217,6 @@ namespace leveldb {
 			return s;
 		}
 	};
-
-
 
 	class DBTest {
 	private:
@@ -541,461 +539,387 @@ namespace leveldb {
 			}
 			return files_renamed;
 		}
-
-		void Empty() {
-			std::cout << "DBTestTest" << std::endl;
-			do {
-				ASSERT_TRUE(db_ != NULL);
-				ASSERT_EQ("NOT_FOUND", Get("foo"));
-			} while (ChangeOptions());
-		}
-
-		void ReadWrite() {
-			std::cout << "ReadWrite" << std::endl;
-			do {
-				ASSERT_OK(Put("foo", "v1"));
-				ASSERT_EQ("v1", Get("foo"));
-				ASSERT_OK(Put("bar", "v2"));
-				ASSERT_OK(Put("foo", "v3"));
-				ASSERT_EQ("v3", Get("foo"));
-				ASSERT_EQ("v2", Get("bar"));
-			} while (ChangeOptions());
-		}
-
-		void PutDeleteGet() {
-			std::cout << "PutDeleteGet" << std::endl;
-			do {
-				ASSERT_OK(db_->Put(WriteOptions(), "foo", "v1"));
-				ASSERT_EQ("v1", Get("foo"));
-				ASSERT_OK(db_->Put(WriteOptions(), "foo", "v2"));
-				ASSERT_EQ("v2", Get("foo"));
-				ASSERT_OK(db_->Delete(WriteOptions(), "foo"));
-				ASSERT_EQ("NOT_FOUND", Get("foo"));
-			} while (ChangeOptions());
-		}
-
-		void GetFromImmutableLayer() {
-			std::cout << "GetFromImmutableLayer" << std::endl;
-			do {
-				Options options = CurrentOptions();
-				options.env = env_;
-				options.write_buffer_size = 100000;  // Small write buffer
-				Reopen(&options);
-
-				ASSERT_OK(Put("foo", "v1"));
-				ASSERT_EQ("v1", Get("foo"));
-
-				env_->delay_data_sync_.Release_Store(env_);      // Block sync calls
-				Put("k1", std::string(100000, 'x'));             // Fill memtable
-				Put("k2", std::string(100000, 'y'));             // Trigger compaction
-				ASSERT_EQ("v1", Get("foo"));
-				env_->delay_data_sync_.Release_Store(NULL);      // Release sync calls
-			} while (ChangeOptions());
-		}
-
-		void GetFromVersions() {
-			std::cout << "GetFromVersions" << std::endl;
-			do {
-				ASSERT_OK(Put("foo", "v1"));
-				dbfull()->TEST_CompactMemTable();
-				ASSERT_EQ("v1", Get("foo"));
-			} while (ChangeOptions());
-		}
-
-		void GetSnapshot() {
-			std::cout << "GetSnapshot" << std::endl;
-			do {
-				// Try with both a short key and a long key
-				for (int i = 0; i < 2; i++) {
-					std::string key = (i == 0) ? std::string("foo") : std::string(200, 'x');
-					ASSERT_OK(Put(key, "v1"));
-					const Snapshot* s1 = db_->GetSnapshot();
-					ASSERT_OK(Put(key, "v2"));
-					ASSERT_EQ("v2", Get(key));
-					ASSERT_EQ("v1", Get(key, s1));
-					dbfull()->TEST_CompactMemTable();
-					ASSERT_EQ("v2", Get(key));
-					ASSERT_EQ("v1", Get(key, s1));
-					db_->ReleaseSnapshot(s1);
-				}
-			} while (ChangeOptions());
-		}
-
-		void GetLevel0Ordering() {
-			std::cout << "GetLevel0Ordering" << std::endl;
-			do {
-				// Check that we process level-0 files in correct order.  The code
-				// below generates two level-0 files where the earlier one comes
-				// before the later one in the level-0 file list since the earlier
-				// one has a smaller "smallest" key.
-				ASSERT_OK(Put("bar", "b"));
-				ASSERT_OK(Put("foo", "v1"));
-				dbfull()->TEST_CompactMemTable();
-				ASSERT_OK(Put("foo", "v2"));
-				dbfull()->TEST_CompactMemTable();
-				ASSERT_EQ("v2", Get("foo"));
-			} while (ChangeOptions());
-		}
-
-		void GetOrderedByLevels() {
-			std::cout << "GetOrderedByLevels" << std::endl;
-			do {
-				ASSERT_OK(Put("foo", "v1"));
-				Compact("a", "z");
-				ASSERT_EQ("v1", Get("foo"));
-				ASSERT_OK(Put("foo", "v2"));
-				ASSERT_EQ("v2", Get("foo"));
-				dbfull()->TEST_CompactMemTable();
-				ASSERT_EQ("v2", Get("foo"));
-			} while (ChangeOptions());
-		}
-
-		void GetPicksCorrectFile() {
-			std::cout << "GetPicksCorrectFile" << std::endl;
-			do {
-				// Arrange to have multiple files in a non-level-0 level.
-				ASSERT_OK(Put("a", "va"));
-				Compact("a", "b");
-				ASSERT_OK(Put("x", "vx"));
-				Compact("x", "y");
-				ASSERT_OK(Put("f", "vf"));
-				Compact("f", "g");
-				ASSERT_EQ("va", Get("a"));
-				ASSERT_EQ("vf", Get("f"));
-				ASSERT_EQ("vx", Get("x"));
-			} while (ChangeOptions());
-		}
-
-		void GetEncountersEmptyLevel() {
-			std::cout << "GetEncountersEmptyLevel" << std::endl;
-			do {
-				// Arrange for the following to happen:
-				//   * sstable A in level 0
-				//   * nothing in level 1
-				//   * sstable B in level 2
-				// Then do enough Get() calls to arrange for an automatic compaction
-				// of sstable A.  A bug would cause the compaction to be marked as
-				// occuring at level 1 (instead of the correct level 0).
-
-				// Step 1: First place sstables in levels 0 and 2
-				int compaction_count = 0;
-				while (NumTableFilesAtLevel(0) == 0 ||
-					NumTableFilesAtLevel(2) == 0) {
-					ASSERT_LE(compaction_count, 100) << "could not fill levels 0 and 2";
-					compaction_count++;
-					Put("a", "begin");
-					Put("z", "end");
-					dbfull()->TEST_CompactMemTable();
-				}
-
-				// Step 2: clear level 1 if necessary.
-				dbfull()->TEST_CompactRange(1, NULL, NULL);
-				ASSERT_EQ(NumTableFilesAtLevel(0), 1);
-				ASSERT_EQ(NumTableFilesAtLevel(1), 0);
-				ASSERT_EQ(NumTableFilesAtLevel(2), 1);
-
-				// Step 3: read a bunch of times
-				for (int i = 0; i < 1000; i++) {
-					ASSERT_EQ("NOT_FOUND", Get("missing"));
-				}
-
-				// Step 4: Wait for compaction to finish
-				env_->SleepForMicroseconds(1000000);
-
-				ASSERT_EQ(NumTableFilesAtLevel(0), 0);
-			} while (ChangeOptions());
-		}
-
-		void IterEmpty() {
-			std::cout << "IterEmpty" << std::endl;
-			Iterator* iter = db_->NewIterator(ReadOptions());
-
-			iter->SeekToFirst();
-			ASSERT_EQ(IterStatus(iter), "(invalid)");
-
-			iter->SeekToLast();
-			ASSERT_EQ(IterStatus(iter), "(invalid)");
-
-			iter->Seek("foo");
-			ASSERT_EQ(IterStatus(iter), "(invalid)");
-
-			delete iter;
-		}
-
-		void IterSingle() {
-			std::cout << "IterSingle" << std::endl;
-			ASSERT_OK(Put("a", "va"));
-			Iterator* iter = db_->NewIterator(ReadOptions());
-
-			iter->SeekToFirst();
-			ASSERT_EQ(IterStatus(iter), "a->va");
-			iter->Next();
-			ASSERT_EQ(IterStatus(iter), "(invalid)");
-			iter->SeekToFirst();
-			ASSERT_EQ(IterStatus(iter), "a->va");
-			iter->Prev();
-			ASSERT_EQ(IterStatus(iter), "(invalid)");
-
-			iter->SeekToLast();
-			ASSERT_EQ(IterStatus(iter), "a->va");
-			iter->Next();
-			ASSERT_EQ(IterStatus(iter), "(invalid)");
-			iter->SeekToLast();
-			ASSERT_EQ(IterStatus(iter), "a->va");
-			iter->Prev();
-			ASSERT_EQ(IterStatus(iter), "(invalid)");
-
-			iter->Seek("");
-			ASSERT_EQ(IterStatus(iter), "a->va");
-			iter->Next();
-			ASSERT_EQ(IterStatus(iter), "(invalid)");
-
-			iter->Seek("a");
-			ASSERT_EQ(IterStatus(iter), "a->va");
-			iter->Next();
-			ASSERT_EQ(IterStatus(iter), "(invalid)");
-
-			iter->Seek("b");
-			ASSERT_EQ(IterStatus(iter), "(invalid)");
-
-			delete iter;
-		}
-
-		void IterMulti() {
-			std::cout << "IterMulti" << std::endl;
-			ASSERT_OK(Put("a", "va"));
-			ASSERT_OK(Put("b", "vb"));
-			ASSERT_OK(Put("c", "vc"));
-			Iterator* iter = db_->NewIterator(ReadOptions());
-
-			iter->SeekToFirst();
-			ASSERT_EQ(IterStatus(iter), "a->va");
-			iter->Next();
-			ASSERT_EQ(IterStatus(iter), "b->vb");
-			iter->Next();
-			ASSERT_EQ(IterStatus(iter), "c->vc");
-			iter->Next();
-			ASSERT_EQ(IterStatus(iter), "(invalid)");
-			iter->SeekToFirst();
-			ASSERT_EQ(IterStatus(iter), "a->va");
-			iter->Prev();
-			ASSERT_EQ(IterStatus(iter), "(invalid)");
-
-			iter->SeekToLast();
-			ASSERT_EQ(IterStatus(iter), "c->vc");
-			iter->Prev();
-			ASSERT_EQ(IterStatus(iter), "b->vb");
-			iter->Prev();
-			ASSERT_EQ(IterStatus(iter), "a->va");
-			iter->Prev();
-			ASSERT_EQ(IterStatus(iter), "(invalid)");
-			iter->SeekToLast();
-			ASSERT_EQ(IterStatus(iter), "c->vc");
-			iter->Next();
-			ASSERT_EQ(IterStatus(iter), "(invalid)");
-
-			iter->Seek("");
-			ASSERT_EQ(IterStatus(iter), "a->va");
-			iter->Seek("a");
-			ASSERT_EQ(IterStatus(iter), "a->va");
-			iter->Seek("ax");
-			ASSERT_EQ(IterStatus(iter), "b->vb");
-			iter->Seek("b");
-			ASSERT_EQ(IterStatus(iter), "b->vb");
-			iter->Seek("z");
-			ASSERT_EQ(IterStatus(iter), "(invalid)");
-
-			// Switch from reverse to forward
-			iter->SeekToLast();
-			iter->Prev();
-			iter->Prev();
-			iter->Next();
-			ASSERT_EQ(IterStatus(iter), "b->vb");
-
-			// Switch from forward to reverse
-			iter->SeekToFirst();
-			iter->Next();
-			iter->Next();
-			iter->Prev();
-			ASSERT_EQ(IterStatus(iter), "b->vb");
-
-			// Make sure iter stays at snapshot
-			ASSERT_OK(Put("a", "va2"));
-			ASSERT_OK(Put("a2", "va3"));
-			ASSERT_OK(Put("b", "vb2"));
-			ASSERT_OK(Put("c", "vc2"));
-			ASSERT_OK(Delete("b"));
-			iter->SeekToFirst();
-			ASSERT_EQ(IterStatus(iter), "a->va");
-			iter->Next();
-			ASSERT_EQ(IterStatus(iter), "b->vb");
-			iter->Next();
-			ASSERT_EQ(IterStatus(iter), "c->vc");
-			iter->Next();
-			ASSERT_EQ(IterStatus(iter), "(invalid)");
-			iter->SeekToLast();
-			ASSERT_EQ(IterStatus(iter), "c->vc");
-			iter->Prev();
-			ASSERT_EQ(IterStatus(iter), "b->vb");
-			iter->Prev();
-			ASSERT_EQ(IterStatus(iter), "a->va");
-			iter->Prev();
-			ASSERT_EQ(IterStatus(iter), "(invalid)");
-
-			delete iter;
-		}
-
-		void IterSmallAndLargeMix() {
-			std::cout << "IterSmallAndLargeMix" << std::endl;
-			ASSERT_OK(Put("a", "va"));
-			ASSERT_OK(Put("b", std::string(100000, 'b')));
-			ASSERT_OK(Put("c", "vc"));
-			ASSERT_OK(Put("d", std::string(100000, 'd')));
-			ASSERT_OK(Put("e", std::string(100000, 'e')));
-
-			Iterator* iter = db_->NewIterator(ReadOptions());
-
-			iter->SeekToFirst();
-			ASSERT_EQ(IterStatus(iter), "a->va");
-			iter->Next();
-			ASSERT_EQ(IterStatus(iter), "b->" + std::string(100000, 'b'));
-			iter->Next();
-			ASSERT_EQ(IterStatus(iter), "c->vc");
-			iter->Next();
-			ASSERT_EQ(IterStatus(iter), "d->" + std::string(100000, 'd'));
-			iter->Next();
-			ASSERT_EQ(IterStatus(iter), "e->" + std::string(100000, 'e'));
-			iter->Next();
-			ASSERT_EQ(IterStatus(iter), "(invalid)");
-
-			iter->SeekToLast();
-			ASSERT_EQ(IterStatus(iter), "e->" + std::string(100000, 'e'));
-			iter->Prev();
-			ASSERT_EQ(IterStatus(iter), "d->" + std::string(100000, 'd'));
-			iter->Prev();
-			ASSERT_EQ(IterStatus(iter), "c->vc");
-			iter->Prev();
-			ASSERT_EQ(IterStatus(iter), "b->" + std::string(100000, 'b'));
-			iter->Prev();
-			ASSERT_EQ(IterStatus(iter), "a->va");
-			iter->Prev();
-			ASSERT_EQ(IterStatus(iter), "(invalid)");
-
-			delete iter;
-		}
-
-		void IterMultiWithDelete() {
-			std::cout << "IterMultiWithDelete" << std::endl;
-			do {
-				ASSERT_OK(Put("a", "va"));
-				ASSERT_OK(Put("b", "vb"));
-				ASSERT_OK(Put("c", "vc"));
-				ASSERT_OK(Delete("b"));
-				ASSERT_EQ("NOT_FOUND", Get("b"));
-
-				Iterator* iter = db_->NewIterator(ReadOptions());
-				iter->Seek("c");
-				ASSERT_EQ(IterStatus(iter), "c->vc");
-				iter->Prev();
-				ASSERT_EQ(IterStatus(iter), "a->va");
-				delete iter;
-			} while (ChangeOptions());
-		}
-
-		void Recover() {
-			std::cout << "Recover" << std::endl;
-			do {
-				ASSERT_OK(Put("foo", "v1"));
-				ASSERT_OK(Put("baz", "v5"));
-
-				Reopen();
-				ASSERT_EQ("v1", Get("foo"));
-
-				ASSERT_EQ("v1", Get("foo"));
-				ASSERT_EQ("v5", Get("baz"));
-				ASSERT_OK(Put("bar", "v2"));
-				ASSERT_OK(Put("foo", "v3"));
-
-				Reopen();
-				ASSERT_EQ("v3", Get("foo"));
-				ASSERT_OK(Put("foo", "v4"));
-				ASSERT_EQ("v4", Get("foo"));
-				ASSERT_EQ("v2", Get("bar"));
-				ASSERT_EQ("v5", Get("baz"));
-			} while (ChangeOptions());
-		}
 	};
 
 
-	DBTestRunner::DBTestRunner() {}
-	DBTestRunner::~DBTestRunner() {}
+	//class _Test_DBTest_Empty : public DBTest
+	//{
+	//public:
+	//	void _Run();
+	//	static void _RunIt() { _Test_DBTest_Empty t; t._Run(); }
+	//};
+	////why is this not executed in my case?
+	//bool _Test_ignored_DBTest_Empty = ::leveldb::test::RegisterTest("DBTest", "Empty", &_Test_DBTest_Empty::_RunIt);
+	//void _Test_DBTest_Empty::_Run() {
+	//	//testing code
+	//}
 
-	void DBTestRunner::RunAllTests() {
-		DBTest *dt = new DBTest();
-		dt->Empty();
-		delete dt;
-
-		dt = new DBTest();
-		dt->ReadWrite();
-		delete dt;
-
-		dt = new DBTest();
-		dt->PutDeleteGet();
-		delete dt;
-
-		dt = new DBTest();
-		dt->GetFromImmutableLayer();
-		delete dt;
-
-		dt = new DBTest();
-		dt->GetFromVersions();
-		delete dt;
-
-		dt = new DBTest();
-		dt->GetSnapshot();
-		delete dt;
-
-		dt = new DBTest();
-		dt->GetLevel0Ordering();
-		delete dt;
-
-		dt = new DBTest();
-		dt->GetOrderedByLevels();
-		delete dt;
-
-		dt = new DBTest();
-		dt->GetPicksCorrectFile();
-		delete dt;
-
-		dt = new DBTest();
-		dt->GetEncountersEmptyLevel();
-		delete dt;
-
-		dt = new DBTest();
-		dt->IterEmpty();
-		delete dt;
-
-		dt = new DBTest();
-		dt->IterSingle();
-		delete dt;
-
-		dt = new DBTest();
-		dt->IterMulti();
-		delete dt;
-
-		dt = new DBTest();
-		dt->IterSmallAndLargeMix();
-		delete dt;
-
-		dt = new DBTest();
-		dt->IterMultiWithDelete();
-		delete dt;
-
-		dt = new DBTest();
-		dt->Recover();
-		delete dt;
+	TEST(DBTest, Empty) {
+		do {
+			ASSERT_TRUE(db_ != NULL);
+			ASSERT_EQ("NOT_FOUND", Get("foo"));
+		} while (ChangeOptions());
 	}
 
+	TEST(DBTest, ReadWrite) {
+		do {
+			ASSERT_OK(Put("foo", "v1"));
+			ASSERT_EQ("v1", Get("foo"));
+			ASSERT_OK(Put("bar", "v2"));
+			ASSERT_OK(Put("foo", "v3"));
+			ASSERT_EQ("v3", Get("foo"));
+			ASSERT_EQ("v2", Get("bar"));
+		} while (ChangeOptions());
+	}
+
+	TEST(DBTest, PutDeleteGet) {
+		do {
+			ASSERT_OK(db_->Put(WriteOptions(), "foo", "v1"));
+			ASSERT_EQ("v1", Get("foo"));
+			ASSERT_OK(db_->Put(WriteOptions(), "foo", "v2"));
+			ASSERT_EQ("v2", Get("foo"));
+			ASSERT_OK(db_->Delete(WriteOptions(), "foo"));
+			ASSERT_EQ("NOT_FOUND", Get("foo"));
+		} while (ChangeOptions());
+	}
+
+	TEST(DBTest, GetFromImmutableLayer) {
+		do {
+			Options options = CurrentOptions();
+			options.env = env_;
+			options.write_buffer_size = 100000;  // Small write buffer
+			Reopen(&options);
+
+			ASSERT_OK(Put("foo", "v1"));
+			ASSERT_EQ("v1", Get("foo"));
+
+			env_->delay_data_sync_.Release_Store(env_);      // Block sync calls
+			Put("k1", std::string(100000, 'x'));             // Fill memtable
+			Put("k2", std::string(100000, 'y'));             // Trigger compaction
+			ASSERT_EQ("v1", Get("foo"));
+			env_->delay_data_sync_.Release_Store(NULL);      // Release sync calls
+		} while (ChangeOptions());
+	}
+
+	TEST(DBTest, GetFromVersions) {
+		do {
+			ASSERT_OK(Put("foo", "v1"));
+			dbfull()->TEST_CompactMemTable();
+			ASSERT_EQ("v1", Get("foo"));
+		} while (ChangeOptions());
+	}
+
+	TEST(DBTest, GetSnapshot) {
+		do {
+			// Try with both a short key and a long key
+			for (int i = 0; i < 2; i++) {
+				std::string key = (i == 0) ? std::string("foo") : std::string(200, 'x');
+				ASSERT_OK(Put(key, "v1"));
+				const Snapshot* s1 = db_->GetSnapshot();
+				ASSERT_OK(Put(key, "v2"));
+				ASSERT_EQ("v2", Get(key));
+				ASSERT_EQ("v1", Get(key, s1));
+				dbfull()->TEST_CompactMemTable();
+				ASSERT_EQ("v2", Get(key));
+				ASSERT_EQ("v1", Get(key, s1));
+				db_->ReleaseSnapshot(s1);
+			}
+		} while (ChangeOptions());
+	}
+
+	TEST(DBTest, GetLevel0Ordering) {
+		do {
+			// Check that we process level-0 files in correct order.  The code
+			// below generates two level-0 files where the earlier one comes
+			// before the later one in the level-0 file list since the earlier
+			// one has a smaller "smallest" key.
+			ASSERT_OK(Put("bar", "b"));
+			ASSERT_OK(Put("foo", "v1"));
+			dbfull()->TEST_CompactMemTable();
+			ASSERT_OK(Put("foo", "v2"));
+			dbfull()->TEST_CompactMemTable();
+			ASSERT_EQ("v2", Get("foo"));
+		} while (ChangeOptions());
+	}
+
+	TEST(DBTest, GetOrderedByLevels) {
+		do {
+			ASSERT_OK(Put("foo", "v1"));
+			Compact("a", "z");
+			ASSERT_EQ("v1", Get("foo"));
+			ASSERT_OK(Put("foo", "v2"));
+			ASSERT_EQ("v2", Get("foo"));
+			dbfull()->TEST_CompactMemTable();
+			ASSERT_EQ("v2", Get("foo"));
+		} while (ChangeOptions());
+	}
+
+	TEST(DBTest, GetPicksCorrectFile) {
+		do {
+			// Arrange to have multiple files in a non-level-0 level.
+			ASSERT_OK(Put("a", "va"));
+			Compact("a", "b");
+			ASSERT_OK(Put("x", "vx"));
+			Compact("x", "y");
+			ASSERT_OK(Put("f", "vf"));
+			Compact("f", "g");
+			ASSERT_EQ("va", Get("a"));
+			ASSERT_EQ("vf", Get("f"));
+			ASSERT_EQ("vx", Get("x"));
+		} while (ChangeOptions());
+	}
+
+	TEST(DBTest, GetEncountersEmptyLevel) {
+		do {
+			// Arrange for the following to happen:
+			//   * sstable A in level 0
+			//   * nothing in level 1
+			//   * sstable B in level 2
+			// Then do enough Get() calls to arrange for an automatic compaction
+			// of sstable A.  A bug would cause the compaction to be marked as
+			// occuring at level 1 (instead of the correct level 0).
+
+			// Step 1: First place sstables in levels 0 and 2
+			int compaction_count = 0;
+			while (NumTableFilesAtLevel(0) == 0 ||
+				NumTableFilesAtLevel(2) == 0) {
+				ASSERT_LE(compaction_count, 100) << "could not fill levels 0 and 2";
+				compaction_count++;
+				Put("a", "begin");
+				Put("z", "end");
+				dbfull()->TEST_CompactMemTable();
+			}
+
+			// Step 2: clear level 1 if necessary.
+			dbfull()->TEST_CompactRange(1, NULL, NULL);
+			ASSERT_EQ(NumTableFilesAtLevel(0), 1);
+			ASSERT_EQ(NumTableFilesAtLevel(1), 0);
+			ASSERT_EQ(NumTableFilesAtLevel(2), 1);
+
+			// Step 3: read a bunch of times
+			for (int i = 0; i < 1000; i++) {
+				ASSERT_EQ("NOT_FOUND", Get("missing"));
+			}
+
+			// Step 4: Wait for compaction to finish
+			env_->SleepForMicroseconds(1000000);
+
+			ASSERT_EQ(NumTableFilesAtLevel(0), 0);
+		} while (ChangeOptions());
+	}
+
+	TEST(DBTest, IterEmpty) {
+		Iterator* iter = db_->NewIterator(ReadOptions());
+
+		iter->SeekToFirst();
+		ASSERT_EQ(IterStatus(iter), "(invalid)");
+
+		iter->SeekToLast();
+		ASSERT_EQ(IterStatus(iter), "(invalid)");
+
+		iter->Seek("foo");
+		ASSERT_EQ(IterStatus(iter), "(invalid)");
+
+		delete iter;
+	}
+
+	TEST(DBTest, IterSingle) {
+		ASSERT_OK(Put("a", "va"));
+		Iterator* iter = db_->NewIterator(ReadOptions());
+
+		iter->SeekToFirst();
+		ASSERT_EQ(IterStatus(iter), "a->va");
+		iter->Next();
+		ASSERT_EQ(IterStatus(iter), "(invalid)");
+		iter->SeekToFirst();
+		ASSERT_EQ(IterStatus(iter), "a->va");
+		iter->Prev();
+		ASSERT_EQ(IterStatus(iter), "(invalid)");
+
+		iter->SeekToLast();
+		ASSERT_EQ(IterStatus(iter), "a->va");
+		iter->Next();
+		ASSERT_EQ(IterStatus(iter), "(invalid)");
+		iter->SeekToLast();
+		ASSERT_EQ(IterStatus(iter), "a->va");
+		iter->Prev();
+		ASSERT_EQ(IterStatus(iter), "(invalid)");
+
+		iter->Seek("");
+		ASSERT_EQ(IterStatus(iter), "a->va");
+		iter->Next();
+		ASSERT_EQ(IterStatus(iter), "(invalid)");
+
+		iter->Seek("a");
+		ASSERT_EQ(IterStatus(iter), "a->va");
+		iter->Next();
+		ASSERT_EQ(IterStatus(iter), "(invalid)");
+
+		iter->Seek("b");
+		ASSERT_EQ(IterStatus(iter), "(invalid)");
+
+		delete iter;
+	}
+
+	TEST(DBTest, IterMulti) {
+		ASSERT_OK(Put("a", "va"));
+		ASSERT_OK(Put("b", "vb"));
+		ASSERT_OK(Put("c", "vc"));
+		Iterator* iter = db_->NewIterator(ReadOptions());
+
+		iter->SeekToFirst();
+		ASSERT_EQ(IterStatus(iter), "a->va");
+		iter->Next();
+		ASSERT_EQ(IterStatus(iter), "b->vb");
+		iter->Next();
+		ASSERT_EQ(IterStatus(iter), "c->vc");
+		iter->Next();
+		ASSERT_EQ(IterStatus(iter), "(invalid)");
+		iter->SeekToFirst();
+		ASSERT_EQ(IterStatus(iter), "a->va");
+		iter->Prev();
+		ASSERT_EQ(IterStatus(iter), "(invalid)");
+
+		iter->SeekToLast();
+		ASSERT_EQ(IterStatus(iter), "c->vc");
+		iter->Prev();
+		ASSERT_EQ(IterStatus(iter), "b->vb");
+		iter->Prev();
+		ASSERT_EQ(IterStatus(iter), "a->va");
+		iter->Prev();
+		ASSERT_EQ(IterStatus(iter), "(invalid)");
+		iter->SeekToLast();
+		ASSERT_EQ(IterStatus(iter), "c->vc");
+		iter->Next();
+		ASSERT_EQ(IterStatus(iter), "(invalid)");
+
+		iter->Seek("");
+		ASSERT_EQ(IterStatus(iter), "a->va");
+		iter->Seek("a");
+		ASSERT_EQ(IterStatus(iter), "a->va");
+		iter->Seek("ax");
+		ASSERT_EQ(IterStatus(iter), "b->vb");
+		iter->Seek("b");
+		ASSERT_EQ(IterStatus(iter), "b->vb");
+		iter->Seek("z");
+		ASSERT_EQ(IterStatus(iter), "(invalid)");
+
+		// Switch from reverse to forward
+		iter->SeekToLast();
+		iter->Prev();
+		iter->Prev();
+		iter->Next();
+		ASSERT_EQ(IterStatus(iter), "b->vb");
+
+		// Switch from forward to reverse
+		iter->SeekToFirst();
+		iter->Next();
+		iter->Next();
+		iter->Prev();
+		ASSERT_EQ(IterStatus(iter), "b->vb");
+
+		// Make sure iter stays at snapshot
+		ASSERT_OK(Put("a", "va2"));
+		ASSERT_OK(Put("a2", "va3"));
+		ASSERT_OK(Put("b", "vb2"));
+		ASSERT_OK(Put("c", "vc2"));
+		ASSERT_OK(Delete("b"));
+		iter->SeekToFirst();
+		ASSERT_EQ(IterStatus(iter), "a->va");
+		iter->Next();
+		ASSERT_EQ(IterStatus(iter), "b->vb");
+		iter->Next();
+		ASSERT_EQ(IterStatus(iter), "c->vc");
+		iter->Next();
+		ASSERT_EQ(IterStatus(iter), "(invalid)");
+		iter->SeekToLast();
+		ASSERT_EQ(IterStatus(iter), "c->vc");
+		iter->Prev();
+		ASSERT_EQ(IterStatus(iter), "b->vb");
+		iter->Prev();
+		ASSERT_EQ(IterStatus(iter), "a->va");
+		iter->Prev();
+		ASSERT_EQ(IterStatus(iter), "(invalid)");
+
+		delete iter;
+	}
+
+	TEST(DBTest, IterSmallAndLargeMix) {
+		ASSERT_OK(Put("a", "va"));
+		ASSERT_OK(Put("b", std::string(100000, 'b')));
+		ASSERT_OK(Put("c", "vc"));
+		ASSERT_OK(Put("d", std::string(100000, 'd')));
+		ASSERT_OK(Put("e", std::string(100000, 'e')));
+
+		Iterator* iter = db_->NewIterator(ReadOptions());
+
+		iter->SeekToFirst();
+		ASSERT_EQ(IterStatus(iter), "a->va");
+		iter->Next();
+		ASSERT_EQ(IterStatus(iter), "b->" + std::string(100000, 'b'));
+		iter->Next();
+		ASSERT_EQ(IterStatus(iter), "c->vc");
+		iter->Next();
+		ASSERT_EQ(IterStatus(iter), "d->" + std::string(100000, 'd'));
+		iter->Next();
+		ASSERT_EQ(IterStatus(iter), "e->" + std::string(100000, 'e'));
+		iter->Next();
+		ASSERT_EQ(IterStatus(iter), "(invalid)");
+
+		iter->SeekToLast();
+		ASSERT_EQ(IterStatus(iter), "e->" + std::string(100000, 'e'));
+		iter->Prev();
+		ASSERT_EQ(IterStatus(iter), "d->" + std::string(100000, 'd'));
+		iter->Prev();
+		ASSERT_EQ(IterStatus(iter), "c->vc");
+		iter->Prev();
+		ASSERT_EQ(IterStatus(iter), "b->" + std::string(100000, 'b'));
+		iter->Prev();
+		ASSERT_EQ(IterStatus(iter), "a->va");
+		iter->Prev();
+		ASSERT_EQ(IterStatus(iter), "(invalid)");
+
+		delete iter;
+	}
+
+	TEST(DBTest, IterMultiWithDelete) {
+		do {
+			ASSERT_OK(Put("a", "va"));
+			ASSERT_OK(Put("b", "vb"));
+			ASSERT_OK(Put("c", "vc"));
+			ASSERT_OK(Delete("b"));
+			ASSERT_EQ("NOT_FOUND", Get("b"));
+
+			Iterator* iter = db_->NewIterator(ReadOptions());
+			iter->Seek("c");
+			ASSERT_EQ(IterStatus(iter), "c->vc");
+			iter->Prev();
+			ASSERT_EQ(IterStatus(iter), "a->va");
+			delete iter;
+		} while (ChangeOptions());
+	}
+
+	TEST(DBTest, Recover) {
+		do {
+			ASSERT_OK(Put("foo", "v1"));
+			ASSERT_OK(Put("baz", "v5"));
+
+			Reopen();
+			ASSERT_EQ("v1", Get("foo"));
+
+			ASSERT_EQ("v1", Get("foo"));
+			ASSERT_EQ("v5", Get("baz"));
+			ASSERT_OK(Put("bar", "v2"));
+			ASSERT_OK(Put("foo", "v3"));
+
+			Reopen();
+			ASSERT_EQ("v3", Get("foo"));
+			ASSERT_OK(Put("foo", "v4"));
+			ASSERT_EQ("v4", Get("foo"));
+			ASSERT_EQ("v2", Get("bar"));
+			ASSERT_EQ("v5", Get("baz"));
+		} while (ChangeOptions());
+	}
 
 	TEST(DBTest, RecoveryWithEmptyLog) {
 		do {

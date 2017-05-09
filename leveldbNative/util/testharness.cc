@@ -9,9 +9,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "db/autocompact_test.h"
-#include "db/corruption_test.h"
-#include "db/db_test.h"
 #include <iostream>
 namespace leveldb {
 	namespace test {
@@ -24,7 +21,6 @@ namespace leveldb {
 			};
 			std::vector<Test>* tests;
 		}
-
 		bool RegisterTest(const char* base, const char* name, void(*func)()) {
 			if (tests == NULL) {
 				tests = new std::vector<Test>;
@@ -38,27 +34,30 @@ namespace leveldb {
 		}
 
 		int RunAllTests() {
-			//const char* matcher = getenv("LEVELDB_TESTS");
+			const char* matcher = getenv("LEVELDB_TESTS");
 
-			//int num = 0;
-			//if (tests != NULL) {
-			//	for (size_t i = 0; i < tests->size(); i++) {
-			//		const Test& t = (*tests)[i];
-			//		if (matcher != NULL) {
-			//			std::string name = t.base;
-			//			name.push_back('.');
-			//			name.append(t.name);
-			//			if (strstr(name.c_str(), matcher) == NULL) {
-			//				continue;
-			//			}
-			//		}
-			//		fprintf(stderr, "==== Test %s.%s\n", t.base, t.name);
-			//		(*t.func)();
-			//		++num;
-			//	}
-			//}
+			int num = 0;
+			if (tests != NULL) {
+				for (size_t i = 0; i < tests->size(); i++) {
+					const Test& t = (*tests)[i];
+					if (matcher != NULL) {
+						std::string name = t.base;
+						name.push_back('.');
+						name.append(t.name);
+						if (strstr(name.c_str(), matcher) == NULL) {
+							continue;
+						}
+					}
+					fprintf(stderr, "==== Test %s.%s\n", t.base, t.name);
+					(*t.func)();
+					++num;
+				}
+			}
+			fprintf(stderr, "==== PASSED %d tests\n", num);
 
-			std::cout << "==========AutoCompactTest==========" << std::endl;
+
+
+			/*std::cout << "==========AutoCompactTest==========" << std::endl;
 			AutoCompactTest *ac = new AutoCompactTest();
 			ac->DoReads(ac->kCount);
 			delete ac;
@@ -104,16 +103,8 @@ namespace leveldb {
 			std::cout << "==========DbTest==========" << std::endl;
 			DBTestRunner *dt = new DBTestRunner();
 			dt->RunAllTests();
-			delete dt;
+			delete dt;*/
 			
-			
-			
-
-			
-			
-
-
-			//fprintf(stderr, "==== PASSED %d tests\n", num);
 			return 0;
 		}
 

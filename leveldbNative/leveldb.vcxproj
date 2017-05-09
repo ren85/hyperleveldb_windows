@@ -157,7 +157,6 @@
     <ClInclude Include="db\dbformat.h" />
     <ClInclude Include="db\db_impl.h" />
     <ClInclude Include="db\db_iter.h" />
-    <ClInclude Include="db\db_test.h" />
     <ClInclude Include="db\filename.h" />
     <ClInclude Include="db\log_format.h" />
     <ClInclude Include="db\log_reader.h" />

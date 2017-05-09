@@ -594,80 +594,130 @@ void PosixRandomAccessFile::_CleanUp()
 // file before reading from it, or for log files, the reading code
 // knows enough to skip zero suffixes.
 
-class BoostFile : public WritableFile {
+//class BoostFile : public WritableFile {
+//
+//public:
+//  explicit BoostFile(std::string path) : path_(path), written_(0) {
+//    Open();
+//  }
+//
+//  virtual ~BoostFile() {
+//    Close();
+//  }
+//
+//private:
+//  void Open() {
+//    // we truncate the file as implemented in env_posix
+//     file_.open(path_.generic_string().c_str(), 
+//         std::ios_base::trunc | std::ios_base::out | std::ios_base::binary);
+//     written_ = 0;
+//  }
+//
+//public:
+//  virtual Status Append(const Slice& data) {
+//    Status result;
+//    file_.write(data.data(), data.size());
+//    if (!file_.good()) {
+//      result = Status::IOError(
+//          path_.generic_string() + " Append", "cannot write");
+//    }
+//    return result;
+//  }
+//
+//  virtual Status Close() {
+//    Status result;
+//
+//    try {
+//      if (file_.is_open()) {
+//        Sync();
+//        file_.close();
+//      }
+//    } catch (const std::exception & e) {
+//      result = Status::IOError(path_.generic_string() + " close", e.what());
+//    }
+//
+//    return result;
+//  }
+//
+//  virtual Status Flush() {
+//    file_.flush();
+//    return Status::OK();
+//  }
+//
+//  virtual Status Sync() {
+//    Status result;
+//    try {
+//      Flush();
+//    } catch (const std::exception & e) {
+//      result = Status::IOError(path_.string() + " sync", e.what());
+//    }
+//
+//    return result;
+//  }
+//
+//private:
+//  boost::filesystem::path path_;
+//  boost::uint64_t written_;
+//  std::ofstream file_;
+//};
 
+
+
+//class BoostFileLock : public FileLock {
+// public:
+//  boost::interprocess::file_lock fl_;
+//};
+
+class Win32FileLock : public FileLock
+{
 public:
-  explicit BoostFile(std::string path) : path_(path), written_(0) {
-    Open();
-  }
-
-  virtual ~BoostFile() {
-    Close();
-  }
-
+	friend class PosixEnv;
+	virtual ~Win32FileLock();
+	BOOL isEnable();
 private:
-  void Open() {
-    // we truncate the file as implemented in env_posix
-     file_.open(path_.generic_string().c_str(), 
-         std::ios_base::trunc | std::ios_base::out | std::ios_base::binary);
-     written_ = 0;
-  }
-
-public:
-  virtual Status Append(const Slice& data) {
-    Status result;
-    file_.write(data.data(), data.size());
-    if (!file_.good()) {
-      result = Status::IOError(
-          path_.generic_string() + " Append", "cannot write");
-    }
-    return result;
-  }
-
-  virtual Status Close() {
-    Status result;
-
-    try {
-      if (file_.is_open()) {
-        Sync();
-        file_.close();
-      }
-    } catch (const std::exception & e) {
-      result = Status::IOError(path_.generic_string() + " close", e.what());
-    }
-
-    return result;
-  }
-
-  virtual Status Flush() {
-    file_.flush();
-    return Status::OK();
-  }
-
-  virtual Status Sync() {
-    Status result;
-    try {
-      Flush();
-    } catch (const std::exception & e) {
-      result = Status::IOError(path_.string() + " sync", e.what());
-    }
-
-    return result;
-  }
-
-private:
-  boost::filesystem::path path_;
-  boost::uint64_t written_;
-  std::ofstream file_;
+	BOOL _Init(LPCWSTR path);
+	void _CleanUp();
+	Win32FileLock(const std::string& fname);
+	HANDLE _hFile;
+	std::string _filename;
+	DISALLOW_COPY_AND_ASSIGN(Win32FileLock);
 };
+Win32FileLock::Win32FileLock(const std::string& fname) :
+	_hFile(NULL), _filename(fname)
+{
+	std::wstring path;
+	ToWidePath(fname, path);
+	_Init(path.c_str());
+}
 
+Win32FileLock::~Win32FileLock()
+{
+	_CleanUp();
+}
 
+BOOL Win32FileLock::_Init(LPCWSTR path)
+{
+	BOOL bRet = FALSE;
+	if (!_hFile)
+		_hFile = ::CreateFileW(path, GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (!_hFile || _hFile == INVALID_HANDLE_VALUE) {
+		_hFile = NULL;
+	}
+	else
+		bRet = TRUE;
+	return bRet;
+}
 
-class BoostFileLock : public FileLock {
- public:
-  boost::interprocess::file_lock fl_;
-};
+void Win32FileLock::_CleanUp()
+{
+	::CloseHandle(_hFile);
+	_hFile = NULL;
+}
 
+BOOL Win32FileLock::isEnable()
+{
+	return _hFile ? TRUE : FALSE;
+}
 //void ToWidePath(const std::string& value, std::wstring& target) {
 //	wchar_t buffer[MAX_PATH];
 //	MultiByteToWideChar(CP_ACP, 0, value.c_str(), -1, buffer, MAX_PATH);
@@ -996,42 +1046,57 @@ class PosixEnv : public Env {
   }
 
   virtual Status LockFile(const std::string& fname, FileLock** lock) {
-    *lock = NULL;
+    //*lock = NULL;
 
-    Status result;
+    //Status result;
 
-    try {
-      if (!boost::filesystem::exists(fname)) {
-        std::ofstream of(fname, std::ios_base::trunc | std::ios_base::out);
-      }
+    //try {
+    //  if (!boost::filesystem::exists(fname)) {
+    //    std::ofstream of(fname, std::ios_base::trunc | std::ios_base::out);
+    //  }
 
-      assert(boost::filesystem::exists(fname));
+    //  assert(boost::filesystem::exists(fname));
 
-      boost::interprocess::file_lock fl(fname.c_str());
-      BoostFileLock * my_lock = new BoostFileLock();
-      my_lock->fl_ = std::move(fl);
-      my_lock->fl_.lock();
-      *lock = my_lock;
-    } catch (const std::exception & e) {
-      result = Status::IOError("lock " + fname, e.what());
-    }
+    //  boost::interprocess::file_lock fl(fname.c_str());
+    //  BoostFileLock * my_lock = new BoostFileLock();
+    //  my_lock->fl_ = std::move(fl);
+    //  my_lock->fl_.lock();
+    //  *lock = my_lock;
+    //} catch (const std::exception & e) {
+    //  result = Status::IOError("lock " + fname, e.what());
+    //}
 
-    return result;
+    //return result;
+	  Status sRet;
+	  std::string path = fname;
+	  ModifyPath(path);
+	  Win32FileLock* _lock = new Win32FileLock(path);
+	  if (!_lock->isEnable()) {
+		  delete _lock;
+		  *lock = NULL;
+		  sRet = Status::IOError(path, "Could not lock file.");
+	  }
+	  else
+		  *lock = _lock;
+	  return sRet;
   }
 
   virtual Status UnlockFile(FileLock* lock) {
 
-    Status result;
+    //Status result;
 
-    try {
-      BoostFileLock * my_lock = static_cast<BoostFileLock *>(lock);
-      my_lock->fl_.unlock();
-      delete my_lock;
-    } catch (const std::exception & e) {
-      result = Status::IOError("unlock", e.what());
-    }
+    //try {
+    //  BoostFileLock * my_lock = static_cast<BoostFileLock *>(lock);
+    //  my_lock->fl_.unlock();
+    //  delete my_lock;
+    //} catch (const std::exception & e) {
+    //  result = Status::IOError("unlock", e.what());
+    //}
 
-    return result;
+    //return result;
+	  Status sRet;
+	  delete lock;
+	  return sRet;
   }
 
   virtual void Schedule(void (*function)(void*), void* arg);
@@ -1088,7 +1153,8 @@ class PosixEnv : public Env {
   }
 
   virtual void SleepForMicroseconds(int micros) {
-  boost::this_thread::sleep(boost::posix_time::microseconds(micros));
+  //boost::this_thread::sleep(boost::posix_time::microseconds(micros));
+	  ::Sleep((micros + 999) / 1000);
   }
 
  private:
