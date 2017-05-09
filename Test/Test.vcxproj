@@ -155,7 +155,27 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\leveldbNative\db\autocompact_test.cc" />
+    <ClCompile Include="..\leveldbNative\db\corruption_test.cc" />
+    <ClCompile Include="..\leveldbNative\db\dbformat_test.cc" />
     <ClCompile Include="..\leveldbNative\db\db_test.cc" />
+    <ClCompile Include="..\leveldbNative\db\filename_test.cc" />
+    <ClCompile Include="..\leveldbNative\db\log_test.cc" />
+    <ClCompile Include="..\leveldbNative\db\skiplist_test.cc" />
+    <ClCompile Include="..\leveldbNative\db\version_edit_test.cc" />
+    <ClCompile Include="..\leveldbNative\db\version_set_test.cc" />
+    <ClCompile Include="..\leveldbNative\db\write_batch_test.cc" />
+    <ClCompile Include="..\leveldbNative\helpers\memenv\memenv_test.cc" />
+    <ClCompile Include="..\leveldbNative\issues\issue178_test.cc" />
+    <ClCompile Include="..\leveldbNative\issues\issue200_test.cc" />
+    <ClCompile Include="..\leveldbNative\table\filter_block_test.cc" />
+    <ClCompile Include="..\leveldbNative\table\table_test.cc" />
+    <ClCompile Include="..\leveldbNative\util\arena_test.cc" />
+    <ClCompile Include="..\leveldbNative\util\bloom_test.cc" />
+    <ClCompile Include="..\leveldbNative\util\cache_test.cc" />
+    <ClCompile Include="..\leveldbNative\util\coding_test.cc" />
+    <ClCompile Include="..\leveldbNative\util\crc32c_test.cc" />
+    <ClCompile Include="..\leveldbNative\util\env_test.cc" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

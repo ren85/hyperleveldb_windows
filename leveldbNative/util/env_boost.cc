@@ -15,6 +15,8 @@
 #include <sys/types.h>
 #include <time.h>
 #include <io.h>
+
+#include <DbgHelp.h>
 #else
 #include <dirent.h>
 #include <errno.h>
@@ -129,6 +131,17 @@ namespace leveldb {
 				return Status::OK();
 			}
 		};
+
+		typedef void(*ScheduleProc)(void*);
+
+		struct WorkItemWrapper
+		{
+			WorkItemWrapper(ScheduleProc proc_, void* content_);
+			ScheduleProc proc;
+			void* pContent;
+		};
+
+		DWORD WINAPI WorkItemWrapperProc(LPVOID pContent);
 
 		// We preallocate up to an extra megabyte and use memcpy to append new
 		// data to the file.  This is safe since we either properly close the
@@ -881,7 +894,7 @@ namespace leveldb {
 
 			virtual Status GetChildren(const std::string& dir,
 				std::vector<std::string>* result) {
-				result->clear();
+				/*result->clear();
 
 				boost::system::error_code ec;
 				boost::filesystem::directory_iterator current(dir, ec);
@@ -895,11 +908,35 @@ namespace leveldb {
 					result->push_back(current->path().filename().generic_string());
 				}
 
-				return Status::OK();
+				return Status::OK();*/
+				Status sRet;
+				::WIN32_FIND_DATAW wfd;
+				std::string path = dir;
+				ModifyPath(path);
+				path += "\\*.*";
+				std::wstring wpath;
+				ToWidePath(path, wpath);
+
+				::HANDLE hFind = ::FindFirstFileW(wpath.c_str(), &wfd);
+				if (hFind && hFind != INVALID_HANDLE_VALUE) {
+					BOOL hasNext = TRUE;
+					std::string child;
+					while (hasNext) {
+						ToNarrowPath(wfd.cFileName, child);
+						if (child != ".." && child != ".") {
+							result->push_back(child);
+						}
+						hasNext = ::FindNextFileW(hFind, &wfd);
+					}
+					::FindClose(hFind);
+				}
+				else
+					sRet = Status::IOError(dir, "Could not get children.");
+				return sRet;
 			}
 
 			virtual Status DeleteFile(const std::string& fname) {
-				boost::system::error_code ec;
+				/*boost::system::error_code ec;
 
 				boost::filesystem::remove(fname, ec);
 
@@ -909,7 +946,16 @@ namespace leveldb {
 					result = Status::IOError(fname, ec.message());
 				}
 
-				return result;
+				return result;*/
+				Status sRet;
+				std::string path = fname;
+				std::wstring wpath;
+				ToWidePath(ModifyPath(path), wpath);
+
+				if (!::DeleteFileW(wpath.c_str())) {
+					sRet = Status::IOError(path, "Could not delete file.");
+				}
+				return sRet;
 			}
 
 			virtual Status CreateDir(const std::string& name) {
@@ -927,6 +973,17 @@ namespace leveldb {
 				}
 
 				return result;
+
+				//Status sRet;
+				//std::string path = name;
+				//if (path[path.length() - 1] != '\\') {
+				//	path += '\\';
+				//}
+				//ModifyPath(path);
+				//if (!::MakeSureDirectoryPathExists(path.c_str())) {
+				//	sRet = Status::IOError(name, "Could not create directory.");
+				//}
+				//return sRet;
 			};
 
 			virtual Status DeleteDir(const std::string& name) {
@@ -941,7 +998,7 @@ namespace leveldb {
 			};
 
 			virtual Status GetFileSize(const std::string& fname, uint64_t* size) {
-				boost::system::error_code ec;
+				/*boost::system::error_code ec;
 
 				Status result;
 
@@ -951,7 +1008,22 @@ namespace leveldb {
 					result = Status::IOError(fname, ec.message());
 				}
 
-				return result;
+				return result;*/
+				Status sRet;
+				std::string path = fname;
+				std::wstring wpath;
+				ToWidePath(ModifyPath(path), wpath);
+
+				HANDLE file = ::CreateFileW(wpath.c_str(),
+					GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+				LARGE_INTEGER li;
+				if (::GetFileSizeEx(file, &li)) {
+					*size = (uint64_t)li.QuadPart;
+				}
+				else
+					sRet = Status::IOError(path, "Could not get the file size.");
+				CloseHandle(file);
+				return sRet;
 			}
 
 
@@ -1150,9 +1222,10 @@ namespace leveldb {
 			}
 
 			virtual uint64_t NowMicros() {
-				return static_cast<uint64_t>(
+				/*return static_cast<uint64_t>(
 					boost::posix_time::microsec_clock::universal_time()
-					.time_of_day().total_microseconds());
+					.time_of_day().total_microseconds());*/
+				return (uint64_t)(GetTickCount() * 1000);
 			}
 
 			virtual void SleepForMicroseconds(int micros) {
@@ -1188,23 +1261,42 @@ namespace leveldb {
 
 		PosixEnv::PosixEnv() { }
 
+		WorkItemWrapper::WorkItemWrapper(ScheduleProc proc_, void* content_) :
+			proc(proc_), pContent(content_)
+		{
+
+		}
+
+		DWORD WINAPI WorkItemWrapperProc(LPVOID pContent)
+		{
+			WorkItemWrapper* item = static_cast<WorkItemWrapper*>(pContent);
+			ScheduleProc TempProc = item->proc;
+			void* arg = item->pContent;
+			delete item;
+			TempProc(arg);
+			return 0;
+		}
+
 		void PosixEnv::Schedule(void(*function)(void*), void* arg) {
-			boost::unique_lock<boost::mutex> lock(mu_);
+			//boost::unique_lock<boost::mutex> lock(mu_);
 
-			// Start background thread if necessary
-			if (!bgthread_) {
-				bgthread_.reset(
-					new boost::thread(boost::bind(&PosixEnv::BGThreadWrapper, this)));
-			}
+			//// Start background thread if necessary
+			//if (!bgthread_) {
+			//	bgthread_.reset(
+			//		new boost::thread(boost::bind(&PosixEnv::BGThreadWrapper, this)));
+			//}
 
-			// Add to priority queue
-			queue_.push_back(BGItem());
-			queue_.back().function = function;
-			queue_.back().arg = arg;
+			//// Add to priority queue
+			//queue_.push_back(BGItem());
+			//queue_.back().function = function;
+			//queue_.back().arg = arg;
 
-			lock.unlock();
+			//lock.unlock();
 
-			bgsignal_.notify_one();
+			//bgsignal_.notify_one();
+			QueueUserWorkItem(WorkItemWrapperProc,
+				new WorkItemWrapper(function, arg),
+				WT_EXECUTEDEFAULT);
 
 		}
 
@@ -1241,16 +1333,19 @@ namespace leveldb {
 		}
 
 		void PosixEnv::StartThread(void(*function)(void* arg), void* arg) {
-			StartThreadState* state = new StartThreadState;
-			state->user_function = function;
-			state->arg = arg;
+			//StartThreadState* state = new StartThreadState;
+			//state->user_function = function;
+			//state->arg = arg;
 
-			boost::thread t(boost::bind(&StartThreadWrapper, state));
+			//boost::thread t(boost::bind(&StartThreadWrapper, state));
+
+			::_beginthread(function, 0, arg);
 		}
 
 	}
 
-	static boost::once_flag once = BOOST_ONCE_INIT;
+	static port::OnceType once_env = LEVELDB_ONCE_INIT;
+	/*static boost::once_flag once = BOOST_ONCE_INIT;*/
 	static Env* default_env;
 	static void InitDefaultEnv() {
 		::memset(global_read_only_buf, 0, sizeof(global_read_only_buf));
@@ -1258,8 +1353,8 @@ namespace leveldb {
 	}
 
 	Env* Env::Default() {
-		boost::call_once(once, InitDefaultEnv);
-
+		//boost::call_once(once, InitDefaultEnv);
+		port::InitOnce(&once_env, InitDefaultEnv);
 		return default_env;
 	}
 
