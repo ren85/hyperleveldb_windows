@@ -12,8 +12,12 @@ Tested in different scenarios - working, but sometimes throws exceptions.
 
 Good starting point for someone with better knowledge of C++ and hyperleveldb.
 
-Stitched together from
+Stitched together from these leveldb ports:
 
 https://github.com/Reactive-Extensions/LevelDB (not very good port, but has clear project structure)
 
 https://github.com/ren85/leveldb-windows (much better port)
+
+And of course hyperleveldb:
+
+https://github.com/rescrv/HyperLevelDB
